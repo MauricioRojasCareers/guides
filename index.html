@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Mauricio's practical technical guides">
+  <title>Mauricio's Guides</title>
+  <style>
+    :root { color-scheme: dark; --bg:#090d14; --panel:#121925; --text:#edf2fa; --muted:#aab5c5; --line:#2b394c; --accent:#79dbc1; --blue:#82b4ff; }
+    * { box-sizing:border-box; }
+    body { margin:0; min-height:100vh; font:16px/1.55 system-ui,-apple-system,"Segoe UI",sans-serif; color:var(--text); background:radial-gradient(circle at 80% 0,#18322f 0,transparent 34rem),radial-gradient(circle at 0 50%,#1c2240 0,transparent 30rem),var(--bg); }
+    main { width:min(980px,100%); margin:auto; padding:clamp(36px,7vw,80px) 20px 90px; }
+    .eyebrow { color:var(--accent); font-weight:800; letter-spacing:.16em; text-transform:uppercase; }
+    h1 { margin:.15em 0 .2em; font-size:clamp(3rem,9vw,6.5rem); line-height:.95; letter-spacing:-.06em; }
+    .lead { max-width:57ch; color:var(--muted); font-size:1.2rem; }
+    .grid { display:grid; grid-template-columns:repeat(3,1fr); gap:16px; margin-top:44px; }
+    .card { display:flex; min-height:260px; flex-direction:column; padding:22px; border:1px solid var(--line); border-radius:16px; color:var(--text); background:color-mix(in srgb,var(--panel) 94%,transparent); text-decoration:none; transition:transform .16s,border-color .16s,background .16s; }
+    .card:hover,.card:focus-visible { transform:translateY(-4px); border-color:var(--accent); background:#162231; outline:none; }
+    .number { color:var(--accent); font:800 .8rem ui-monospace,monospace; letter-spacing:.1em; }
+    h2 { margin:.7em 0 .35em; font-size:1.55rem; line-height:1.12; }
+    .card p { margin:0; color:var(--muted); }
+    .open { margin-top:auto; padding-top:22px; color:var(--blue); font-weight:700; }
+    footer { margin-top:50px; padding-top:22px; border-top:1px solid var(--line); color:var(--muted); font-size:.92rem; }
+    code { padding:.12em .35em; border-radius:4px; background:#202b3c; color:#fff; }
+    @media(max-width:760px){ .grid{grid-template-columns:1fr}.card{min-height:190px} }
+  </style>
+</head>
+<body>
+<main>
+  <div class="eyebrow">Personal reference library</div>
+  <h1>Mauricio's guides</h1>
+  <p class="lead">Practical, machine-specific notes for the tools and workflows I use. Pick a guide below.</p>
+
+  <section class="grid" aria-label="Available guides">
+    <a class="card" href="build-images-guide.html">
+      <span class="number">GUIDE 01</span>
+      <h2>Building Yocto images</h2>
+      <p>Build CM4, CM5, SOM, and x64 Phoenix Linux images and identify the correct release artifacts.</p>
+      <span class="open">Read guide →</span>
+    </a>
+    <a class="card" href="herdr-intro-guide.html">
+      <span class="number">GUIDE 02</span>
+      <h2>Herdr, from zero</h2>
+      <p>Understand sessions, workspaces, tabs, panes, persistence, and the custom keyboard setup.</p>
+      <span class="open">Read guide →</span>
+    </a>
+    <a class="card" href="neovim-learning-guide.html">
+      <span class="number">GUIDE 03</span>
+      <h2>Neovim: basic to fluent</h2>
+      <p>Build real Vim fluency and learn the exact plugins and shortcuts configured on this machine.</p>
+      <span class="open">Read guide →</span>
+    </a>
+  </section>
+
+  <footer>Published automatically from the <code>guides</code> repository with GitHub Actions and GitHub Pages.</footer>
+</main>
+</body>
+</html>

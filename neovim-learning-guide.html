@@ -1,0 +1,323 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Neovim: From Basic to Fluent</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #0a0d12;
+      --panel: #111721;
+      --panel2: #172130;
+      --text: #e8edf5;
+      --muted: #a3afc0;
+      --line: #2b3747;
+      --green: #9ece6a;
+      --cyan: #73daca;
+      --blue: #7aa2f7;
+      --yellow: #e0af68;
+      --red: #f7768e;
+    }
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body {
+      margin: 0;
+      font: 16px/1.6 Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      color: var(--text);
+      background:
+        radial-gradient(circle at 86% 0, #17312e 0, transparent 33rem),
+        radial-gradient(circle at 0 22%, #1a2140 0, transparent 31rem),
+        var(--bg);
+    }
+    main { width: min(1080px, 100%); margin: auto; padding: 50px 22px 100px; }
+    h1 { max-width: 13ch; margin: .12em 0 .25em; font-size: clamp(2.8rem, 8vw, 5.8rem); line-height: .96; letter-spacing: -.058em; }
+    h2 { margin: 2.35em 0 .75em; font-size: clamp(1.55rem, 4vw, 2.25rem); line-height: 1.15; letter-spacing: -.025em; }
+    h3 { margin: 1.45em 0 .45em; }
+    p, li { max-width: 79ch; }
+    a { color: var(--blue); }
+    code { padding: .12em .37em; border-radius: 5px; background: #202a39; color: #f4f7fb; }
+    pre { overflow: auto; padding: 16px 18px; border: 1px solid var(--line); border-radius: 10px; background: #06090e; }
+    pre code { padding: 0; background: transparent; color: #dce7f7; }
+    kbd { display: inline-block; min-width: 2em; padding: .25em .5em; border: 1px solid #536174; border-bottom-width: 3px; border-radius: 6px; background: #1b2533; color: white; font: 700 .9em/1.2 ui-monospace, SFMono-Regular, Consolas, monospace; text-align: center; box-shadow: 0 2px 0 #05070a; }
+    table { width: 100%; border-collapse: collapse; }
+    th, td { padding: 10px 12px; border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; }
+    th { color: var(--muted); font-size: .78rem; letter-spacing: .08em; text-transform: uppercase; }
+    td:first-child { white-space: nowrap; }
+    .hero { padding: 16px 0 26px; }
+    .eyebrow { color: var(--green); font-weight: 800; letter-spacing: .15em; text-transform: uppercase; }
+    .lead { max-width: 65ch; color: #bdc7d6; font-size: 1.18rem; }
+    .verdict { display: grid; grid-template-columns: auto 1fr; gap: 16px; margin: 24px 0; padding: 21px; border: 1px solid #3b604c; border-radius: 14px; background: #102019; }
+    .verdict .yes { display: grid; place-items: center; width: 62px; height: 62px; border-radius: 50%; background: var(--green); color: #10170c; font-size: 1.4rem; font-weight: 900; }
+    .verdict p { margin: .2em 0; }
+    .callout { margin: 22px 0; padding: 16px 19px; border: 1px solid #34516b; border-left: 4px solid var(--blue); border-radius: 8px; background: #101c2a; }
+    .callout.warning { border-color: #625337; border-left-color: var(--yellow); background: #221e16; }
+    .callout.danger { border-color: #663945; border-left-color: var(--red); background: #25171d; }
+    .callout p { margin: .3em 0; }
+    .cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: 13px; margin: 22px 0; }
+    .card { padding: 18px; border: 1px solid var(--line); border-radius: 13px; background: color-mix(in srgb, var(--panel) 94%, transparent); }
+    .card strong { display: block; margin-bottom: 5px; color: var(--cyan); }
+    .card p { margin: 0; color: var(--muted); font-size: .94rem; }
+    .grammar { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin: 26px 0; padding: 24px; border: 1px solid #46614a; border-radius: 14px; background: linear-gradient(135deg, #132319, #121b28); }
+    .token { padding: .45em .7em; border: 1px solid #45634a; border-radius: 7px; background: #1c3020; color: var(--green); font: 800 1.06rem ui-monospace, SFMono-Regular, Consolas, monospace; }
+    .plus { color: var(--muted); font-weight: 800; }
+    .scroll { overflow-x: auto; border: 1px solid var(--line); border-radius: 12px; background: var(--panel); }
+    .two { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+    .box { padding: 18px; border: 1px solid var(--line); border-radius: 12px; background: var(--panel); }
+    .box h3 { margin-top: 0; }
+    .box ul { padding-left: 1.25rem; }
+    .roadmap { counter-reset: phase; padding: 0; list-style: none; }
+    .roadmap > li { position: relative; margin: 18px 0; padding: 4px 0 20px 58px; border-bottom: 1px solid var(--line); }
+    .roadmap > li::before { counter-increment: phase; content: counter(phase); position: absolute; top: 0; left: 0; display: grid; place-items: center; width: 40px; height: 40px; border-radius: 10px; background: var(--blue); color: #0c111b; font-weight: 900; }
+    .roadmap strong { display: block; }
+    .tag { display: inline-block; margin-left: .35em; padding: .08em .42em; border-radius: 99px; background: #3a3020; color: var(--yellow); font-size: .76rem; font-weight: 800; text-transform: uppercase; }
+    .cheat { margin-top: 36px; padding: 24px; border: 1px solid #3d6458; border-radius: 16px; background: linear-gradient(135deg, #10231c, #111927); }
+    .cheat h2 { margin-top: 0; }
+    .muted, .source { color: var(--muted); }
+    .source { margin-top: 48px; font-size: .9rem; }
+    @media (max-width: 800px) { .cards { grid-template-columns: 1fr 1fr; } .two { grid-template-columns: 1fr; } }
+    @media (max-width: 530px) { main { padding: 30px 14px 70px; } .cards { grid-template-columns: 1fr; } .verdict { grid-template-columns: 1fr; } .verdict .yes { width: 50px; height: 50px; } th, td { padding: 9px 10px; } }
+    @media print { body { background: white; color: #111; } main { max-width: none; padding: 0; } .card,.box,.scroll,.grammar,.cheat,.callout,.verdict,pre { background: #f5f5f5; color: #111; } code,kbd,.token { background: #eee; color: #111; } }
+  </style>
+</head>
+<body>
+<main>
+  <header class="hero">
+    <div class="eyebrow">Neovim 0.11.6 · your configuration</div>
+    <h1>From basic Vim to fluent Neovim</h1>
+    <p class="lead">You already know enough to begin. The next step is not memorizing hundreds of commands—it is learning Vim’s small editing language, then using the project-navigation tools already installed on this computer.</p>
+  </header>
+
+  <section class="verdict">
+    <div class="yes">YES</div>
+    <div>
+      <strong>You have the other person’s Neovim configuration, and it is active.</strong>
+      <p><code>~/.config/nvim</code> is a symbolic link to <code>~/.dotfiles-ubuntu/.config/nvim</code>. The dotfiles README says this is an Ubuntu adaptation of <code>kunchenguid/dotfiles</code>. Neovim loads it successfully, with nine plugins.</p>
+    </div>
+  </section>
+
+  <h2>What this setup gives you</h2>
+  <div class="cards">
+    <div class="card"><strong>Fast project navigation</strong><p>Snacks pickers search files, text, and open buffers. Oil is an editable file browser.</p></div>
+    <div class="card"><strong>Git inside Neovim</strong><p>Neogit provides a Git status UI. Gitsigns marks changed lines and shows current-line blame.</p></div>
+    <div class="card"><strong>A small configuration</strong><p>Rose Pine theme, WhichKey hints, persistent undo, relative line numbers, and system clipboard integration.</p></div>
+  </div>
+  <div class="callout warning">
+    <strong>What it does not provide yet:</strong>
+    <p>There is no language-server setup, completion engine, or Treesitter configuration. The <code>gd</code> mapping can show definitions only when an LSP client is attached. This is a good lightweight editor setup, but not yet a complete language IDE.</p>
+  </div>
+
+  <h2>Start and leave safely</h2>
+  <pre><code># Open one file
+nvim path/to/file
+
+# Start at a project directory
+cd /path/to/project
+nvim .
+
+# Built-in guided lesson
+vimtutor</code></pre>
+  <div class="scroll">
+    <table>
+      <thead><tr><th>Command</th><th>Meaning</th></tr></thead>
+      <tbody>
+        <tr><td><code>:w</code></td><td>Write (save) the current file.</td></tr>
+        <tr><td><code>:q</code></td><td>Quit the current window, if nothing is unsaved.</td></tr>
+        <tr><td><code>:wq</code> or <code>ZZ</code></td><td>Save and quit.</td></tr>
+        <tr><td><code>:q!</code> or <code>ZQ</code></td><td>Quit and discard unsaved changes.</td></tr>
+        <tr><td><code>:e path</code></td><td>Edit another file.</td></tr>
+        <tr><td><code>:help topic</code></td><td>Open Neovim’s authoritative documentation.</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <div class="callout">
+    <strong>Your unusual Escape mapping:</strong>
+    <p><kbd>Esc</kbd> in Insert mode returns to Normal mode normally. Once you are already in Normal mode, pressing <kbd>Esc</kbd> again saves the file. In practice, <strong>double-Escape after typing saves</strong>. You can always use <code>:w</code> when you want the intent to be explicit.</p>
+  </div>
+
+  <h2>The idea that creates proficiency</h2>
+  <p>Vim commands form a grammar. Instead of learning each edit as an unrelated shortcut, combine a count, an operator, and a movement or text object:</p>
+  <div class="grammar">
+    <span class="token">[count]</span><span class="plus">+</span>
+    <span class="token">operator</span><span class="plus">+</span>
+    <span class="token">motion / text object</span>
+  </div>
+  <p><code>d</code> means delete, <code>c</code> means change, and <code>y</code> means yank (copy). A motion answers “how far?” A text object answers “what thing?”</p>
+  <div class="scroll">
+    <table>
+      <thead><tr><th>Command</th><th>Read it as</th><th>Result</th></tr></thead>
+      <tbody>
+        <tr><td><code>dw</code></td><td>delete → word motion</td><td>Delete forward to the next word.</td></tr>
+        <tr><td><code>3dw</code></td><td>three × delete word</td><td>Delete three words.</td></tr>
+        <tr><td><code>ciw</code></td><td>change → inside word</td><td>Replace the current word, wherever the cursor is inside it.</td></tr>
+        <tr><td><code>ci"</code></td><td>change → inside quotes</td><td>Replace the text between quotes, keeping the quotes.</td></tr>
+        <tr><td><code>da(</code></td><td>delete → around parentheses</td><td>Delete the contents and surrounding parentheses.</td></tr>
+        <tr><td><code>yap</code></td><td>yank → around paragraph</td><td>Copy a whole paragraph including surrounding whitespace.</td></tr>
+        <tr><td><code>&gt;ip</code></td><td>indent → inside paragraph</td><td>Indent the current paragraph.</td></tr>
+        <tr><td><code>=a{</code></td><td>format → around braces</td><td>Reindent a brace-delimited block.</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p>Learn <code>i</code> as “inside” and <code>a</code> as “around,” then combine them with <code>w</code> word, <code>p</code> paragraph, <code>"</code> quotes, <code>'</code> single quotes, <code>`</code> backticks, <code>(</code>, <code>[</code>, and <code>{</code>. This one pattern replaces dozens of memorized edits.</p>
+
+  <h2>Movement worth learning</h2>
+  <div class="two">
+    <section class="box">
+      <h3>Within a line</h3>
+      <ul>
+        <li><code>w / b / e</code> — next word, previous word, end of word</li>
+        <li><code>0 / ^ / $</code> — start, first nonblank, end of line</li>
+        <li><code>f{char}</code> — jump onto the next character</li>
+        <li><code>t{char}</code> — jump just before the next character</li>
+        <li><code>;</code> / <code>,</code> — repeat / reverse the last <code>f</code> or <code>t</code></li>
+        <li><code>%</code> — jump to a matching bracket</li>
+      </ul>
+    </section>
+    <section class="box">
+      <h3>Across a file</h3>
+      <ul>
+        <li><code>gg / G</code> — first / last line</li>
+        <li><code>42G</code> or <code>:42</code> — line 42</li>
+        <li><code>{ / }</code> — previous / next paragraph</li>
+        <li><code>Ctrl+U / Ctrl+D</code> — half-page up / down</li>
+        <li><code>Ctrl+O / Ctrl+I</code> — older / newer jump location</li>
+        <li><code>mA</code>, then <code>'A</code> — set and return to a file mark</li>
+      </ul>
+    </section>
+  </div>
+  <p>Your relative line numbers make counts practical: if the destination shows <code>12</code>, type <code>12j</code> or <code>12k</code>. Prefer searches and meaningful motions over repeatedly tapping <code>j</code>.</p>
+
+  <h2>Searching, changing, and repeating</h2>
+  <div class="scroll">
+    <table>
+      <thead><tr><th>Command</th><th>Use</th></tr></thead>
+      <tbody>
+        <tr><td><code>/text</code>, then <code>n / N</code></td><td>Search forward; repeat forward or backward. Search ignores case unless your query contains a capital.</td></tr>
+        <tr><td><code>* / #</code></td><td>Search forward / backward for the word under the cursor.</td></tr>
+        <tr><td><code>:s/old/new/g</code></td><td>Replace every match on the current line.</td></tr>
+        <tr><td><code>:%s/old/new/gc</code></td><td>Replace throughout the file, asking for confirmation.</td></tr>
+        <tr><td><code>.</code></td><td>Repeat the last change. This is one of Vim’s highest-value commands.</td></tr>
+        <tr><td><code>u / Ctrl+R</code></td><td>Undo / redo. Persistent undo is enabled, including after reopening files.</td></tr>
+        <tr><td><code>qaq … q</code>, then <code>@a</code></td><td>Record keystrokes into macro register <code>a</code>, stop, then replay them.</td></tr>
+        <tr><td><code>@@</code></td><td>Repeat the most recently executed macro.</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p>Think “make one edit repeatable.” Use <code>ciw</code> instead of deleting characters one at a time, then move to the next target and press <code>.</code>. Use a macro only when the repeated job involves navigation or several edits.</p>
+
+  <h2>Insert commands you should distinguish</h2>
+  <div class="scroll">
+    <table>
+      <thead><tr><th>Keys</th><th>Meaning</th></tr></thead>
+      <tbody>
+        <tr><td><code>i / a</code></td><td>Insert before / append after the cursor.</td></tr>
+        <tr><td><code>I / A</code></td><td>Insert at the first nonblank / append at line end.</td></tr>
+        <tr><td><code>o / O</code></td><td>Open a new line below / above, then enter Insert mode.</td></tr>
+        <tr><td><code>s / S</code></td><td>Replace one character / replace the whole line.</td></tr>
+        <tr><td><code>C / D</code></td><td>Change / delete from the cursor to line end.</td></tr>
+        <tr><td><code>r / R</code></td><td>Replace one character / enter Replace mode.</td></tr>
+        <tr><td><code>J</code></td><td>Join the next line onto this one.</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p>Your familiar sequence is <code>G</code> followed by <code>o</code> to jump to the bottom and open a line below, or <code>G</code> followed by uppercase <code>O</code> to open above. These are sequences, not keys pressed simultaneously.</p>
+
+  <h2>Visual mode, registers, and the clipboard</h2>
+  <p><code>v</code> selects characters, <code>V</code> selects whole lines, and <code>Ctrl+V</code> creates a rectangular block selection. Apply an operator after selecting: <code>d</code>, <code>y</code>, <code>c</code>, <code>&gt;</code>, or <code>=</code>.</p>
+  <div class="callout warning">
+    <strong>Your default register is the Linux system clipboard.</strong>
+    <p>The configuration sets <code>clipboard=unnamedplus</code>, and <code>xclip</code> is available. Normal yanks, deletes, and changes therefore interact with the system clipboard. The custom Visual-mode <code>p</code> mapping preserves the clipboard when you paste over selected text.</p>
+  </div>
+  <div class="scroll">
+    <table>
+      <thead><tr><th>Command</th><th>Use</th></tr></thead>
+      <tbody>
+        <tr><td><code>"0p</code></td><td>Paste the last yanked text even after a later delete overwrote the default register.</td></tr>
+        <tr><td><code>"_d{motion}</code></td><td>Delete into the black-hole register without changing your clipboard.</td></tr>
+        <tr><td><code>"ay{motion}</code> / <code>"ap</code></td><td>Yank into named register <code>a</code> / paste it.</td></tr>
+        <tr><td><code>:reg</code></td><td>Inspect current register contents.</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h2>Your Space-key tools</h2>
+  <p>The leader key is Space. Press <kbd>Space</kbd> and pause: WhichKey displays the available mappings.</p>
+  <div class="scroll">
+    <table>
+      <thead><tr><th>Keys</th><th>Tool</th><th>How to use it</th></tr></thead>
+      <tbody>
+        <tr><td><code>Space f</code></td><td>Find files</td><td>Type part of a filename, move with <code>Ctrl+J/K</code> or arrows, Enter to open, Esc to cancel.</td></tr>
+        <tr><td><code>Space s</code></td><td>Search project text</td><td>Live grep across the project. Enter opens a result; <code>Ctrl+V</code> opens in a vertical split.</td></tr>
+        <tr><td><code>Space b</code></td><td>Open buffers</td><td>Switch among files already loaded in Neovim.</td></tr>
+        <tr><td><code>Space e</code></td><td>Oil file browser</td><td>Enter opens; <code>-</code> goes to the parent; <code>g?</code> shows Oil help.</td></tr>
+        <tr><td><code>Space g</code></td><td>Neogit</td><td>Git status UI. <code>s</code> stages, <code>u</code> unstages, <code>c</code> opens commit actions, <code>q</code> closes, <code>?</code> shows help.</td></tr>
+        <tr><td><code>gd</code></td><td>LSP definitions</td><td>Shows definition results only when a language server is actually attached.</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <div class="callout danger">
+    <strong>Oil and Neogit can change real files and Git state.</strong>
+    <p>In Oil, you can rename, move, create, or delete by editing directory lines and saving with <code>:w</code>; review its confirmation carefully. In Neogit, <code>x</code> discards the selected change. Use <code>?</code> when uncertain.</p>
+  </div>
+
+  <h2>Buffers, Neovim windows, and Herdr panes</h2>
+  <p>These layers are different:</p>
+  <div class="cards">
+    <div class="card"><strong>Buffer</strong><p>An in-memory file. Closing a window does not necessarily unload its buffer. Use <code>Space b</code> to switch.</p></div>
+    <div class="card"><strong>Neovim window</strong><p>A view onto a buffer inside one Neovim process. Create with <code>:split</code> or <code>:vsplit</code>; move with <code>Ctrl+W h/j/k/l</code>.</p></div>
+    <div class="card"><strong>Herdr pane</strong><p>A separate terminal process outside Neovim. Your Herdr shortcuts are <code>Ctrl+B</code>, then <code>%</code> or <code>"</code>.</p></div>
+  </div>
+  <p>A practical layout is Neovim in one Herdr pane and a shell/test runner in another. Inside Neovim, use buffers for most file switching; create Neovim splits only when you genuinely need two files visible together.</p>
+
+  <h2>Built-in help is part of the workflow</h2>
+  <div class="scroll">
+    <table>
+      <thead><tr><th>Command</th><th>Question it answers</th></tr></thead>
+      <tbody>
+        <tr><td><code>:help motion.txt</code></td><td>What movement commands exist?</td></tr>
+        <tr><td><code>:help text-objects</code></td><td>How do inside/around objects work?</td></tr>
+        <tr><td><code>:help registers</code></td><td>Where did copied or deleted text go?</td></tr>
+        <tr><td><code>:help /</code> or <code>:help CTRL-W</code></td><td>What does a specific normal-mode key do?</td></tr>
+        <tr><td><code>:verbose nmap gd</code></td><td>What mapping owns <code>gd</code>, and where was it defined?</td></tr>
+        <tr><td><code>:checkhealth</code></td><td>Are Neovim and its providers healthy?</td></tr>
+        <tr><td><code>:Lazy</code></td><td>What plugins are installed or loaded?</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p>Inside help, place the cursor on a <code>|tag|</code> and press <code>Ctrl+]</code> to follow it; press <code>Ctrl+T</code> to return.</p>
+
+  <h2>A four-stage path to proficiency</h2>
+  <ol class="roadmap">
+    <li><strong>Stage 1 — movements and clean mode changes</strong>Run <code>vimtutor</code>. Practice <code>w b e 0 ^ $ f t ; , / n N</code>, plus <code>i a I A o O</code>. Always return to Normal mode when you finish inserting.</li>
+    <li><strong>Stage 2 — editing grammar</strong>For one week, deliberately use <code>d/c/y</code> with motions and text objects. Focus on <code>ciw</code>, <code>ci"</code>, <code>da(</code>, <code>yap</code>, counts, and <code>.</code>.</li>
+    <li><strong>Stage 3 — projects, history, and repetition</strong>Use <code>Space f/s/b/e</code> for navigation, <code>Ctrl+O/I</code> for jump history, registers for controlled paste, and a small macro for repetitive edits.</li>
+    <li><strong>Stage 4 — code intelligence</strong>After the editing language feels natural, add language servers, completion, and Treesitter for the languages you actually use. Add them intentionally rather than replacing this config with a giant distribution.</li>
+  </ol>
+  <div class="callout">
+    <strong>A sustainable practice rule:</strong>
+    <p>Choose two commands per week. Put them on a sticky note and force yourself to use them until they become automatic. Speed arrives from composing familiar commands, not from trying to memorize an entire cheat sheet.</p>
+  </div>
+
+  <h2>Ten-minute daily drill</h2>
+  <ol>
+    <li>Open a real project with <code>nvim .</code>.</li>
+    <li>Use <code>Space f</code> to open a file and <code>Space s</code> to find a symbol or phrase.</li>
+    <li>Make three edits using text objects: for example <code>ciw</code>, <code>ci"</code>, and <code>da(</code>.</li>
+    <li>Repeat one edit with <code>.</code>.</li>
+    <li>Navigate away with a search or <code>gd</code> if LSP is attached; return with <code>Ctrl+O</code>.</li>
+    <li>Inspect your changes with <code>Space g</code>, but keep committing optional while you learn the UI.</li>
+    <li>Save explicitly with <code>:w</code>, or press Escape once more after reaching Normal mode.</li>
+  </ol>
+
+  <section class="cheat">
+    <h2>The compact cheat sheet</h2>
+    <p><strong>Move:</strong> <code>w b e</code> · <code>0 ^ $</code> · <code>f t ; ,</code> · <code>/ n N</code> · <code>gg G</code> · <code>Ctrl+O/I</code></p>
+    <p><strong>Edit:</strong> <code>d c y</code> + motion/object · <code>i/a</code> inside/around · <code>u</code> undo · <code>Ctrl+R</code> redo · <code>.</code> repeat</p>
+    <p><strong>Project:</strong> <code>Space f</code> files · <code>Space s</code> text · <code>Space b</code> buffers · <code>Space e</code> file browser · <code>Space g</code> Git</p>
+    <p><strong>Save/leave:</strong> <code>:w</code> · <code>:q</code> · <code>:wq</code> · <code>:q!</code> · <code>:help topic</code></p>
+  </section>
+
+  <p class="source">Tailored by inspecting the live <code>~/.config/nvim</code>, loaded mappings, plugin lockfile, installed plugin documentation, clipboard provider, and Neovim 0.11.6 on this machine. No configuration was changed while creating this guide.</p>
+</main>
+</body>
+</html>

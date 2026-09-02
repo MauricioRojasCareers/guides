@@ -1,0 +1,134 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Phoenix LiDAR Yocto Image Build Guide</title>
+  <style>
+    :root { color-scheme: light dark; --accent:#ef6c35; --panel:#16202b; --text:#e8edf2; --muted:#aeb9c4; --border:#344454; }
+    * { box-sizing:border-box; }
+    body { margin:0; font:16px/1.55 system-ui,sans-serif; background:#0d141b; color:var(--text); }
+    main { max-width:980px; margin:auto; padding:32px 20px 80px; }
+    h1 { font-size:clamp(2rem,5vw,3.4rem); margin:.2em 0; line-height:1.05; }
+    h2 { margin-top:2.2em; padding-bottom:.3em; border-bottom:1px solid var(--border); }
+    h3 { margin-top:1.6em; }
+    p,li { max-width:78ch; }
+    a { color:#73c9ff; }
+    .lead { color:var(--muted); font-size:1.15rem; }
+    .callout { border-left:4px solid var(--accent); background:var(--panel); padding:12px 18px; margin:20px 0; }
+    .danger { border-left-color:#ff5d68; }
+    code { background:#202d39; border-radius:4px; padding:.12em .35em; }
+    pre { position:relative; overflow:auto; background:#071018; border:1px solid var(--border); border-radius:8px; padding:16px; }
+    pre code { padding:0; background:none; color:#d6e6f3; }
+    table { width:100%; border-collapse:collapse; overflow:auto; display:block; }
+    th,td { text-align:left; padding:10px 12px; border:1px solid var(--border); white-space:nowrap; }
+    th { background:var(--panel); }
+    .step { display:inline-grid; place-items:center; width:2rem; height:2rem; border-radius:50%; background:var(--accent); color:#111; font-weight:800; margin-right:.45rem; }
+    @media print { body { background:white; color:#111; } pre,code { background:#eee; color:#111; } .callout,th { background:#f2f2f2; } }
+  </style>
+</head>
+<body>
+<main>
+  <p>PHOENIX LIDAR SYSTEMS</p>
+  <h1>Building the Yocto images</h1>
+  <p class="lead">A practical guide to building CM4, CM5, SOM, and x64 images from <code>buildimage-yocto</code>.</p>
+
+  <div class="callout">
+    <strong>What this builds:</strong> deployable Phoenix Linux system images. The neighboring
+    <code>buildimage-generic</code> repository only creates a legacy Ubuntu 18.04 development container;
+    it is not used by this procedure.
+  </div>
+
+  <h2><span class="step">1</span>Prepare the build host</h2>
+  <p>Use a Linux host with ample free disk space, RAM, and CPU time. Install Git, Docker Engine, and an SSH client. Your user must be able to run <code>docker</code>. The build itself runs in the pinned Siemens kas 3.2 container, so kas does not need to be installed on the host.</p>
+  <pre><code>git --version
+docker --version
+docker run --rm hello-world</code></pre>
+  <p>If the Docker test requires <code>sudo</code>, configure your account for Docker or run the build from an account that already has access. The repository scripts invoke <code>docker</code> directly.</p>
+
+  <h2><span class="step">2</span>Verify private GitLab access</h2>
+  <p>The build fetches Phusion and its submodules through SSH. Ensure your key is present under <code>~/.ssh</code>, registered with GitLab, and authorized for the Phoenix repositories.</p>
+  <pre><code>ssh -T git@gitlab.com
+git ls-remote git@gitlab.com:phoenixlidar/phusion.git master</code></pre>
+  <p>The second command should print a commit ID for <code>master</code>. Fix access before starting a long image build.</p>
+
+  <h2><span class="step">3</span>Enter the repository and select the software revision</h2>
+  <pre><code>cd /home/mauricio/1playground/buildimage-yocto
+
+# Required: branch containing the Phusion/Rover source
+export PHUSION_BRANCH=master
+
+# Optional: pin a tag or full commit. If omitted, the branch tip is used.
+# export PHUSION_COMMIT=9.0.0
+# export PHUSION_COMMIT=0123456789abcdef0123456789abcdef01234567</code></pre>
+  <p>For a reproducible release, set both variables. With only <code>PHUSION_BRANCH</code>, rebuilding later may select a newer commit.</p>
+
+  <h2><span class="step">4</span>Build an image</h2>
+  <table>
+    <thead><tr><th>Hardware</th><th>Command</th><th>Build directory</th></tr></thead>
+    <tbody>
+      <tr><td>Compute Module 4</td><td><code>./build_yocto.sh configs/poky-scarthgap-cm4.yml</code></td><td><code>build-cm4</code></td></tr>
+      <tr><td>Compute Module 5</td><td><code>./build_yocto.sh configs/poky-scarthgap-cm5.yml</code></td><td><code>build-cm5</code></td></tr>
+      <tr><td>Intel SOM / Air2</td><td><code>./build_yocto.sh configs/poky-scarthgap-som.yml</code></td><td><code>build-som</code></td></tr>
+      <tr><td>Intel x64 / Scout</td><td><code>./build_yocto.sh configs/poky-scarthgap-x64.yml</code></td><td><code>build-x64</code></td></tr>
+    </tbody>
+  </table>
+  <p>To build all four sequentially:</p>
+  <pre><code>export PHUSION_BRANCH=master
+./build.sh</code></pre>
+  <p>The first build downloads and compiles a large dependency set. Later builds reuse the repository-level <code>downloads/</code> and <code>sstate-cache/</code> directories.</p>
+
+  <h2><span class="step">5</span>Find the outputs</h2>
+  <p>Normal Yocto deploy output is under the selected build directory:</p>
+  <pre><code>build-&lt;target&gt;/tmp/deploy/images/phoenixlidar-&lt;target&gt;/</code></pre>
+  <p>The build also copies release-ready files into:</p>
+  <pre><code>artifacts/</code></pre>
+  <p>Artifact filenames include the Rover version, Yocto commit, Phusion commit, and branch. List the newest results with:</p>
+  <pre><code>find artifacts -maxdepth 1 -type f -printf '%TY-%Tm-%Td %TH:%TM  %f\n' | sort -r
+
+# Example: inspect one machine's raw deploy output
+find build-cm4/tmp/deploy/images/phoenixlidar-cm4 -maxdepth 1 -type f -printf '%f\n' | sort</code></pre>
+
+  <table>
+    <thead><tr><th>Target</th><th>Release outputs to expect</th></tr></thead>
+    <tbody>
+      <tr><td>CM4 / CM5</td><td><code>.mender</code>, <code>.sdimg.zst</code>, <code>.sdimg.bmap</code>, recovery <code>.wic</code>, <code>.rvdbg.zst</code></td></tr>
+      <tr><td>SOM / x64</td><td><code>.mender</code>, <code>.hddimg</code>, <code>.rvdbg.zst</code></td></tr>
+      <tr><td>Additional raw deploy output</td><td>UEFI VMDK and, for x64, HDD-image bmap output</td></tr>
+    </tbody>
+  </table>
+
+  <h2><span class="step">6</span>Choose the correct artifact</h2>
+  <ul>
+    <li><strong><code>.mender</code>:</strong> update an already-running compatible unit through Mender.</li>
+    <li><strong><code>.sdimg.zst</code> + <code>.sdimg.bmap</code>:</strong> provision CM4/CM5 storage.</li>
+    <li><strong>Recovery <code>.wic</code>:</strong> create an RPi recovery device that restores the embedded system image.</li>
+    <li><strong><code>.hddimg</code>:</strong> create bootable installer media for SOM/x64 targets.</li>
+    <li><strong><code>.rvdbg.zst</code>:</strong> unstripped Rover symbols for diagnosing crashes; it is not boot media.</li>
+  </ul>
+
+  <div class="callout danger">
+    <strong>Destructive operation:</strong> writing an SD, eMMC, USB, WIC, or HDD image overwrites the selected block device. Resolve the exact device with <code>lsblk</code>, unmount its partitions, and verify it again before writing. Recovery media can overwrite a target automatically when booted; remove unrelated storage first.
+  </div>
+
+  <h2>Useful developer workflow</h2>
+  <p>To run a BitBake command inside the correctly configured kas environment without rebuilding the complete image:</p>
+  <pre><code>export PHUSION_BRANCH=master
+./build_yoctoshell.sh configs/poky-scarthgap-cm4.yml \
+  'bitbake phoenix-rover -c compile'</code></pre>
+  <p>Replace the config with the desired target. Other useful Rover tasks include <code>-c cleansstate</code>, <code>-c compile</code>, and <code>-c install</code>. A full image build remains the release verification step.</p>
+
+  <h2>Troubleshooting checklist</h2>
+  <ol>
+    <li>Confirm <code>PHUSION_BRANCH</code> is exported in the same shell.</li>
+    <li>Repeat the <code>git ls-remote</code> test to distinguish SSH failures from Yocto failures.</li>
+    <li>Confirm Docker runs without interactive privilege prompts.</li>
+    <li>Check free space with <code>df -h . /opt</code>.</li>
+    <li>Read the first real <code>ERROR:</code> in the log; later failures are often consequences.</li>
+    <li>Retry the same build command after a transient download failure. Shared downloads and completed work are retained.</li>
+  </ol>
+
+  <p><small>Source of truth: the Scarthgap kas configurations and build scripts in <code>buildimage-yocto</code>. This guide intentionally does not use the older Kirkstone command examples still present in that repository's README.</small></p>
+</main>
+</body>
+</html>

@@ -1,0 +1,247 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Getting Started with Herdr</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #090d14;
+      --panel: #111827;
+      --panel-2: #182235;
+      --text: #edf3ff;
+      --muted: #9daac0;
+      --line: #2b3850;
+      --accent: #8bdbbe;
+      --accent-2: #8bbcff;
+      --warn: #ffd37a;
+      --danger: #ff8f9a;
+    }
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body {
+      margin: 0;
+      font: 16px/1.6 Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      color: var(--text);
+      background:
+        radial-gradient(circle at 85% 0%, #172f3b 0, transparent 34rem),
+        radial-gradient(circle at 0% 25%, #1b203e 0, transparent 30rem),
+        var(--bg);
+    }
+    main { width: min(1040px, 100%); margin: auto; padding: 48px 22px 100px; }
+    h1 { max-width: 14ch; margin: .15em 0 .25em; font-size: clamp(2.6rem, 8vw, 5.6rem); line-height: .98; letter-spacing: -.055em; }
+    h2 { margin: 2.4em 0 .75em; font-size: clamp(1.6rem, 4vw, 2.25rem); line-height: 1.15; letter-spacing: -.025em; }
+    h3 { margin: 1.6em 0 .45em; }
+    p, li { max-width: 76ch; }
+    a { color: var(--accent-2); }
+    code { padding: .12em .38em; border-radius: 5px; background: #202b40; color: #f4f7ff; }
+    pre { overflow: auto; margin: 1rem 0; padding: 16px 18px; border: 1px solid var(--line); border-radius: 10px; background: #060a11; }
+    pre code { padding: 0; background: transparent; color: #dce9ff; }
+    table { width: 100%; border-collapse: collapse; }
+    th, td { padding: 11px 13px; border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; }
+    th { color: var(--muted); font-size: .78rem; letter-spacing: .08em; text-transform: uppercase; }
+    td:first-child { white-space: nowrap; }
+    .eyebrow { color: var(--accent); font-weight: 800; letter-spacing: .16em; text-transform: uppercase; }
+    .lead { max-width: 64ch; color: #bcc7da; font-size: 1.18rem; }
+    .hero { padding: 18px 0 28px; }
+    .cards { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin: 26px 0; }
+    .card { min-height: 155px; padding: 18px; border: 1px solid var(--line); border-radius: 14px; background: color-mix(in srgb, var(--panel) 93%, transparent); }
+    .card strong { display: block; margin-bottom: 5px; color: var(--accent); font-size: 1.05rem; }
+    .card p { margin: 0; color: var(--muted); font-size: .93rem; }
+    .callout { margin: 22px 0; padding: 17px 19px; border: 1px solid #34506a; border-left: 4px solid var(--accent-2); border-radius: 8px; background: #111d2d; }
+    .callout.warning { border-color: #6a5936; border-left-color: var(--warn); background: #241f17; }
+    .callout.danger { border-color: #653743; border-left-color: var(--danger); background: #24171d; }
+    .callout p { margin: .35em 0; }
+    .prefix-demo { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin: 24px 0; padding: 22px; border: 1px solid var(--line); border-radius: 14px; background: var(--panel); }
+    kbd { display: inline-block; min-width: 2.1em; padding: .28em .55em; border: 1px solid #506078; border-bottom-width: 3px; border-radius: 7px; background: #1c2739; color: #fff; font: 700 .92em/1.2 ui-monospace, SFMono-Regular, Consolas, monospace; text-align: center; box-shadow: 0 2px 0 #05070c; }
+    .then { color: var(--muted); font-weight: 700; }
+    .result { margin-left: 5px; color: var(--accent); font-weight: 700; }
+    .steps { counter-reset: step; padding: 0; list-style: none; }
+    .steps > li { position: relative; margin: 18px 0; padding: 2px 0 18px 54px; border-bottom: 1px solid var(--line); }
+    .steps > li::before { counter-increment: step; content: counter(step); position: absolute; top: 0; left: 0; display: grid; place-items: center; width: 36px; height: 36px; border-radius: 50%; background: var(--accent); color: #08110f; font-weight: 900; }
+    .steps strong { display: block; margin-bottom: 3px; }
+    .scroll-table { overflow-x: auto; border: 1px solid var(--line); border-radius: 12px; background: var(--panel); }
+    .custom { color: var(--warn); font-weight: 700; }
+    .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+    .mini { padding: 18px; border: 1px solid var(--line); border-radius: 12px; background: var(--panel); }
+    .mini h3 { margin-top: 0; }
+    .mini ul { padding-left: 1.25rem; }
+    .cheat { margin-top: 34px; padding: 24px; border: 1px solid #3e665e; border-radius: 16px; background: linear-gradient(135deg, #10251f, #111a28); }
+    .cheat h2 { margin-top: 0; }
+    .muted { color: var(--muted); }
+    .source { margin-top: 48px; color: var(--muted); font-size: .9rem; }
+    @media (max-width: 800px) { .cards { grid-template-columns: 1fr 1fr; } .two-col { grid-template-columns: 1fr; } }
+    @media (max-width: 520px) { main { padding: 30px 14px 70px; } .cards { grid-template-columns: 1fr; } .card { min-height: auto; } th, td { padding: 9px 10px; } }
+    @media print { body { background: white; color: #111; } main { max-width: none; padding: 0; } .card,.mini,.scroll-table,.prefix-demo,.cheat,.callout,pre { background: #f6f6f6; color: #111; } code,kbd { background: #eee; color: #111; } a { color: #111; } }
+  </style>
+</head>
+<body>
+<main>
+  <header class="hero">
+    <div class="eyebrow">Your Herdr 0.8.2 setup</div>
+    <h1>Herdr, from zero</h1>
+    <p class="lead">A practical first-day guide to the terminal workspace manager already configured on this computer. Start with the mouse, learn one prefix key, and let your shells and coding agents keep running when you disconnect.</p>
+  </header>
+
+  <div class="callout">
+    <strong>First: it is spelled <code>herdr</code>.</strong>
+    <p>There is no second “e.” Run <code>herdr</code>, not <code>herder</code>. Your Herdr server is already installed and configured.</p>
+  </div>
+
+  <h2>The mental model</h2>
+  <div class="cards">
+    <div class="card"><strong>Session</strong><p>The persistent background Herdr server. Closing your terminal only detaches the view; it does not kill your work.</p></div>
+    <div class="card"><strong>Workspace</strong><p>A project-level container. A good default is one workspace for each repo or investigation.</p></div>
+    <div class="card"><strong>Tab</strong><p>A layout inside a workspace. Use tabs for views such as agent, logs, server, and tests.</p></div>
+    <div class="card"><strong>Pane</strong><p>A real terminal inside a tab. Panes can sit side-by-side or one above another.</p></div>
+  </div>
+  <p>An <strong>agent</strong> is a coding-agent process Herdr recognizes in a pane. The sidebar can show whether it is working, blocked for your input, done, idle, or unknown.</p>
+
+  <h2>Your first session</h2>
+  <ol class="steps">
+    <li><strong>Start from the project you want to work on.</strong><pre><code>cd /path/to/your/project
+herdr</code></pre></li>
+    <li><strong>Use the terminal normally.</strong> Run commands, editors, servers, or an agent such as <code>codex</code> inside the pane. Herdr sits around the terminal; it does not replace your shell.</li>
+    <li><strong>Use the mouse at first.</strong> Click panes, tabs, workspaces, and agent rows to focus them. Right-click for actions. Drag pane borders to resize. Drag over text to select and copy it.</li>
+    <li><strong>Detach when you are leaving.</strong> Press <kbd>Ctrl</kbd>+<kbd>B</kbd>, release both, then press <kbd>Q</kbd>. You can also close the outer terminal window. The server, panes, and agents remain alive.</li>
+    <li><strong>Reattach later.</strong> Open a terminal and run <code>herdr</code> again. Your session returns.</li>
+  </ol>
+
+  <div class="callout warning">
+    <strong>Detach is not stop.</strong>
+    <p><code>Ctrl+B</code>, then <code>Q</code>, leaves everything running. <code>herdr server stop</code> actually ends the default session and its panes. Do not use the stop command merely to exit the UI.</p>
+  </div>
+
+  <h2>How the prefix key works</h2>
+  <p>Most keystrokes must reach the shell or program inside the pane. Herdr therefore reserves one starter key—called the <strong>prefix</strong>—and interprets only the next key as a Herdr action.</p>
+  <div class="prefix-demo">
+    <kbd>Ctrl</kbd> + <kbd>B</kbd>
+    <span class="then">release, then</span>
+    <kbd>C</kbd>
+    <span class="result">→ create a new tab</span>
+  </div>
+  <p>This guide writes that sequence as <code>Prefix C</code>. Do not hold <kbd>Ctrl</kbd> while pressing the action key. If you get lost after pressing the prefix, press <kbd>Esc</kbd> and try again.</p>
+  <div class="callout">
+    <strong>The shortcut you should memorize first:</strong>
+    <p>Press <code>Prefix ?</code> to open Herdr’s live help showing every active binding. In the help screen, press <code>/</code> to filter, Backspace to edit the filter, and <code>Ctrl+U</code> to clear it.</p>
+  </div>
+
+  <h2>Your configured keybindings</h2>
+  <p>The yellow entries are customizations from the setup you copied. They deliberately resemble tmux.</p>
+  <div class="scroll-table">
+    <table>
+      <thead><tr><th>Task</th><th>Keys</th><th>What happens</th></tr></thead>
+      <tbody>
+        <tr><td>Show help</td><td><code>Prefix ?</code></td><td>Show the complete live keymap.</td></tr>
+        <tr><td>Detach</td><td><code>Prefix Q</code></td><td>Leave the UI while everything keeps running.</td></tr>
+        <tr><td>New tab</td><td><code>Prefix C</code></td><td>Create another tab in this workspace.</td></tr>
+        <tr><td>Next / previous tab</td><td><code>Prefix N</code> / <code>Prefix P</code></td><td>Move through tabs.</td></tr>
+        <tr><td>Jump to tab</td><td><code>Prefix 1…9</code></td><td>Open a numbered tab directly.</td></tr>
+        <tr><td>Close tab</td><td class="custom"><code>Prefix &amp;</code></td><td>Press <code>Ctrl+B</code>, then <code>Shift+7</code>.</td></tr>
+        <tr><td>Split side-by-side</td><td class="custom"><code>Prefix %</code></td><td>Open a new pane on the right; press <code>Shift+5</code> for <code>%</code>.</td></tr>
+        <tr><td>Split top-and-bottom</td><td class="custom"><code>Prefix "</code></td><td>Open a new pane below; press <code>Shift+'</code> for <code>"</code>.</td></tr>
+        <tr><td>Focus another pane</td><td><code>Prefix H/J/K/L</code></td><td>Move left, down, up, or right.</td></tr>
+        <tr><td>Cycle panes</td><td><code>Prefix Tab</code></td><td>Move to the next pane without thinking about direction.</td></tr>
+        <tr><td>Close pane</td><td><code>Prefix X</code></td><td>Close only the focused terminal pane.</td></tr>
+        <tr><td>Zoom pane</td><td><code>Prefix Z</code></td><td>Temporarily make the focused pane fill the pane area; repeat to restore.</td></tr>
+        <tr><td>Resize mode</td><td><code>Prefix R</code></td><td>Enter a mode for changing pane sizes.</td></tr>
+        <tr><td>Workspace picker</td><td><code>Prefix W</code></td><td>Navigate your project workspaces.</td></tr>
+        <tr><td>Goto picker</td><td><code>Prefix G</code></td><td>Quickly jump to a workspace, tab, pane, or agent.</td></tr>
+        <tr><td>Toggle sidebar</td><td><code>Prefix B</code></td><td>Collapse or restore the Herdr sidebar.</td></tr>
+        <tr><td>Copy mode</td><td class="custom"><code>Prefix Y</code></td><td>Browse and copy terminal scrollback with the keyboard.</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h2>Copying and scrolling</h2>
+  <div class="two-col">
+    <section class="mini">
+      <h3>Easy: use the mouse</h3>
+      <p>Drag to select terminal text. Your current setup uses Herdr’s normal mouse behavior, so selection copies automatically. Use the mouse wheel to move through scrollback.</p>
+    </section>
+    <section class="mini">
+      <h3>Keyboard: copy mode</h3>
+      <p>Enter with <code>Prefix Y</code>, then:</p>
+      <ul>
+        <li><code>H/J/K/L</code> move around.</li>
+        <li><code>V</code> or Space begins selection.</li>
+        <li><code>Y</code> or Enter copies.</li>
+        <li><code>/</code> searches forward; <code>?</code> searches backward.</li>
+        <li><code>N</code> repeats a search; <code>Shift+N</code> reverses it.</li>
+        <li><code>Q</code> or Esc cancels/exits.</li>
+      </ul>
+    </section>
+  </div>
+
+  <h2>A sensible everyday layout</h2>
+  <p>For one project, keep a single workspace and give each responsibility a clear place:</p>
+  <div class="two-col">
+    <section class="mini">
+      <h3>Tab 1 — agent</h3>
+      <p>Run Codex or another coding agent in the main pane. Split right for a normal shell where you can inspect Git, files, or test output.</p>
+    </section>
+    <section class="mini">
+      <h3>Tab 2 — runtime</h3>
+      <p>Run the application or development server here. Add another pane below for logs or a long-running test watcher.</p>
+    </section>
+  </div>
+  <pre><code># In your project pane
+codex
+
+# Prefix %, then use the new pane for ordinary commands
+git status
+
+# Prefix C, then run a server in the new tab
+npm run dev</code></pre>
+  <p>When an agent needs approval or finishes, its state appears in the sidebar. Click that agent row—or use <code>Prefix G</code>—to jump to it.</p>
+
+  <h2>Workspaces versus named sessions</h2>
+  <p>Use a <strong>workspace</strong> for another project or repo. Workspaces share one Herdr background session and are designed for ordinary organization.</p>
+  <p>Named sessions are fully separate servers and state. Most people do not need them initially. If you eventually want a hard boundary between “work” and “personal,” the basic commands are:</p>
+  <pre><code>herdr session list
+herdr session attach work
+herdr session attach personal</code></pre>
+
+  <h2>Phone and remote use</h2>
+  <p>Herdr runs where the work and code live. From a phone or another computer, SSH into this Linux machine and attach to the same persistent session:</p>
+  <pre><code>ssh mauricio@your-linux-machine
+herdr</code></pre>
+  <p>Herdr adapts to a narrow terminal. Detach with <code>Prefix Q</code>, disconnect SSH, and reattach later. A separate advanced option is <code>herdr --remote &lt;ssh-host&gt;</code>, which uses the local Herdr binary as a thin client for a remote server.</p>
+
+  <h2>Useful maintenance commands</h2>
+  <div class="scroll-table">
+    <table>
+      <thead><tr><th>Command</th><th>Purpose</th></tr></thead>
+      <tbody>
+        <tr><td><code>herdr status</code></td><td>Check the installed client, running server, version, and compatibility.</td></tr>
+        <tr><td><code>herdr --version</code></td><td>Print the installed version.</td></tr>
+        <tr><td><code>herdr config check</code></td><td>Validate the configuration file and show diagnostics.</td></tr>
+        <tr><td><code>herdr server reload-config</code></td><td>Apply edits to the running server.</td></tr>
+        <tr><td><code>herdr update</code></td><td>Download and install the latest stable direct-install release.</td></tr>
+        <tr><td><code>herdr server stop</code></td><td>Actually stop the default session and its panes.</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p>Your configuration file is <code>~/.config/herdr/config.toml</code>. On this machine it is a symbolic link into <code>~/.dotfiles-ubuntu/.config/herdr/</code>, so edits are part of that copied dotfiles setup.</p>
+
+  <h2>If something feels wrong</h2>
+  <ul>
+    <li><strong>A shortcut does nothing:</strong> press <code>Prefix ?</code> and confirm the active binding. The outer terminal or desktop may have intercepted the keystroke.</li>
+    <li><strong>You cannot type <code>Ctrl+B</code> into a program:</strong> press <code>Ctrl+B</code> twice to send a literal prefix through in direct agent attach; in the full UI, cancel prefix mode with Esc if needed.</li>
+    <li><strong>An agent is not recognized:</strong> it still works as a normal terminal process. Use <code>herdr agent list</code> and <code>herdr agent explain &lt;target&gt;</code> to inspect detection.</li>
+    <li><strong>You reopened Herdr in the wrong directory:</strong> the default session persists independently of your current shell. Use the workspace picker rather than expecting a new <code>herdr</code> command to replace the running session.</li>
+    <li><strong>You think work disappeared:</strong> run <code>herdr status</code>, then <code>herdr</code>. Detaching or closing a client normally leaves panes running.</li>
+  </ul>
+
+  <section class="cheat">
+    <h2>Five-minute cheat sheet</h2>
+    <p><code>herdr</code> starts or returns to your session.</p>
+    <p><code>Prefix</code> means <kbd>Ctrl</kbd>+<kbd>B</kbd>, release, then press the action key.</p>
+    <p><code>Prefix ?</code> help · <code>Prefix C</code> new tab · <code>Prefix %</code> split right · <code>Prefix "</code> split down · <code>Prefix H/J/K/L</code> move · <code>Prefix W</code> workspaces · <code>Prefix G</code> goto · <code>Prefix Y</code> copy mode · <code>Prefix Q</code> detach</p>
+  </section>
+
+  <p class="source">Tailored to the active Herdr 0.8.2 configuration on this machine. For the canonical reference, see <a href="https://herdr.dev/docs/">Herdr documentation</a>, especially <a href="https://herdr.dev/docs/keyboard/">Keyboard</a> and <a href="https://herdr.dev/docs/concepts/">Concepts</a>.</p>
+</main>
+</body>
+</html>
