@@ -1,0 +1,263 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Build and develop Phoenix LiDAR Phusion and SpatialExplorer in Docker">
+  <title>Phusion development with Docker</title>
+  <style>
+    :root { color-scheme:dark; --bg:#090d14; --panel:#111925; --panel2:#172231; --text:#edf3fb; --muted:#a8b5c6; --line:#2b3b4d; --green:#76ddb9; --blue:#82b7ff; --yellow:#ffd078; --red:#ff8997; }
+    * { box-sizing:border-box; }
+    html { scroll-behavior:smooth; }
+    body { margin:0; font:16px/1.6 Inter,ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif; color:var(--text); background:radial-gradient(circle at 88% 0,#173a34 0,transparent 35rem),radial-gradient(circle at 0 32%,#1c2444 0,transparent 31rem),var(--bg); }
+    main { width:min(1080px,100%); margin:auto; padding:48px 22px 100px; }
+    h1 { max-width:13ch; margin:.12em 0 .25em; font-size:clamp(2.8rem,8vw,5.8rem); line-height:.96; letter-spacing:-.055em; }
+    h2 { margin:2.3em 0 .7em; font-size:clamp(1.55rem,4vw,2.2rem); line-height:1.15; }
+    h3 { margin:1.5em 0 .45em; }
+    p,li { max-width:80ch; }
+    a { color:var(--blue); }
+    code { padding:.12em .36em; border-radius:5px; background:#202c3c; color:#f5f8ff; }
+    pre { overflow:auto; padding:16px 18px; border:1px solid var(--line); border-radius:10px; background:#060a10; }
+    pre code { padding:0; background:none; color:#dce9f8; }
+    table { width:100%; border-collapse:collapse; }
+    th,td { padding:10px 12px; border-bottom:1px solid var(--line); text-align:left; vertical-align:top; }
+    th { color:var(--muted); font-size:.78rem; letter-spacing:.08em; text-transform:uppercase; }
+    .eyebrow { color:var(--green); font-weight:800; letter-spacing:.15em; text-transform:uppercase; }
+    .lead { max-width:64ch; color:#bec9d8; font-size:1.18rem; }
+    .model { display:grid; grid-template-columns:repeat(3,1fr); gap:13px; margin:25px 0; }
+    .card,.box { padding:18px; border:1px solid var(--line); border-radius:13px; background:color-mix(in srgb,var(--panel) 95%,transparent); }
+    .card strong { display:block; margin-bottom:5px; color:var(--green); }
+    .card p,.muted { margin:0; color:var(--muted); }
+    .callout { margin:22px 0; padding:16px 19px; border:1px solid #38566f; border-left:4px solid var(--blue); border-radius:8px; background:#101d2b; }
+    .callout.warning { border-color:#66583a; border-left-color:var(--yellow); background:#241f16; }
+    .callout.danger { border-color:#6a3b46; border-left-color:var(--red); background:#26181e; }
+    .callout p { margin:.3em 0; }
+    .steps { counter-reset:step; padding:0; list-style:none; }
+    .steps > li { position:relative; margin:20px 0; padding:2px 0 20px 55px; border-bottom:1px solid var(--line); }
+    .steps > li::before { counter-increment:step; content:counter(step); position:absolute; left:0; top:0; display:grid; place-items:center; width:38px; height:38px; border-radius:10px; background:var(--green); color:#09120f; font-weight:900; }
+    .steps > li > strong { display:block; margin-bottom:5px; }
+    .two { display:grid; grid-template-columns:1fr 1fr; gap:15px; }
+    .box h3 { margin-top:0; }
+    .scroll { overflow-x:auto; border:1px solid var(--line); border-radius:12px; background:var(--panel); }
+    .check { margin-top:36px; padding:23px; border:1px solid #3e695e; border-radius:15px; background:linear-gradient(135deg,#10251f,#111a29); }
+    .check h2 { margin-top:0; }
+    .source { margin-top:48px; color:var(--muted); font-size:.9rem; }
+    @media(max-width:800px){ .model,.two{grid-template-columns:1fr} }
+    @media(max-width:520px){ main{padding:30px 14px 70px} th,td{padding:9px 10px} }
+    @media print { body{background:white;color:#111} .card,.box,.scroll,.check,.callout,pre{background:#f5f5f5;color:#111} code{background:#eee;color:#111} }
+  </style>
+</head>
+<body>
+<main>
+  <header>
+    <div class="eyebrow">Phoenix LiDAR · independent developer workflow</div>
+    <h1>Build Phusion with Docker</h1>
+    <p class="lead">A repeatable workflow for building and actively developing the Linux SpatialExplorer Qt application without installing its large dependency stack directly on the host.</p>
+  </header>
+
+  <h2>The mental model</h2>
+  <div class="model">
+    <section class="card"><strong>buildimage-generic</strong><p>A Dockerfile that produces the Ubuntu 26.04 <code>resolute</code> development environment, including Qt and the native dependencies.</p></section>
+    <section class="card"><strong>phusion</strong><p>The live source checkout. Docker bind-mounts it at <code>/phusion</code>, so edits and build artifacts stay on the host.</p></section>
+    <section class="card"><strong>build-gui</strong><p>The persistent CMake/Ninja build tree. The first build is large; later builds compile only what changed.</p></section>
+  </div>
+  <div class="callout">
+    <strong>The container is the toolchain, not the source of truth.</strong>
+    <p>Edit files normally under <code>/home/mauricio/1playground/phusion</code>. Start a disposable container whenever you need to configure, build, test, or run. Deleting the container does not delete the mounted source or <code>build-gui/</code>.</p>
+  </div>
+
+  <h2>One-time host setup</h2>
+  <p>You need Git, Docker Engine, an SSH key authorized for the private Phoenix GitLab repositories, substantial free disk space, and an x86-64 Linux desktop.</p>
+  <pre><code>git --version
+docker --version
+docker run --rm hello-world
+ssh-add -l
+ssh -T git@gitlab.com
+df -h /home/mauricio</code></pre>
+  <p>If Docker reports permission denied, add the account to the Docker group and then log out and back in (or reboot):</p>
+  <pre><code>sudo groupadd -f docker
+sudo usermod -aG docker "$USER"
+sudo systemctl daemon-reload
+sudo systemctl restart docker
+sudo reboot</code></pre>
+  <div class="callout warning">
+    <strong>Docker-group membership is effectively root-level access.</strong>
+    <p>Only use it on a machine and account you trust. After reconnecting, rerun <code>docker run --rm hello-world</code> before attempting the long build.</p>
+  </div>
+
+  <h2>Clone and prepare both repositories</h2>
+  <pre><code>mkdir -p /home/mauricio/1playground
+cd /home/mauricio/1playground
+
+git clone git@gitlab.com:phoenixlidar/buildimage-generic.git
+git clone --recursive git@gitlab.com:phoenixlidar/phusion.git
+
+cd buildimage-generic
+git switch --track origin/resolute
+
+cd ../phusion
+git submodule update --init --recursive</code></pre>
+  <p>If the repositories already exist, update deliberately rather than cloning again:</p>
+  <pre><code>cd /home/mauricio/1playground/buildimage-generic
+git status
+git switch resolute
+git pull --ff-only
+
+cd /home/mauricio/1playground/phusion
+git status
+git pull --ff-only
+git submodule update --init --recursive</code></pre>
+  <div class="callout warning">
+    <strong>Never pull or switch over work you have not reviewed.</strong>
+    <p>Stop if <code>git status</code> shows source changes you do not recognize. Build directories and generated files may be untracked, but your edits must be understood before updating.</p>
+  </div>
+
+  <h2>Correct the current Resolute permission typo</h2>
+  <p>At the time this guide was written, the upstream Resolute Dockerfile ended with <code>chmod -0644 /opt/setupenv.sh</code>. The leading dash removes permission bits and produces a mode-<code>000</code> file. Root-based CI masks the problem, but a safer UID-mapped developer container cannot source the environment and therefore cannot find Qt.</p>
+  <pre><code>cd /home/mauricio/1playground/buildimage-generic
+grep 'chmod.*setupenv' Dockerfile
+
+# If the output says "chmod -0644", edit it to exactly:
+# RUN chmod 0644 /opt/setupenv.sh</code></pre>
+  <p>Once upstream contains the corrected line, no local edit is needed.</p>
+
+  <h2>Build the Resolute dependency image</h2>
+  <p>The Dockerfile fetches private repositories, so forward the already-loaded SSH agent into BuildKit:</p>
+  <pre><code>cd /home/mauricio/1playground/buildimage-generic
+
+DOCKER_BUILDKIT=1 docker build \
+  --ssh default \
+  --progress=plain \
+  -t buildimage-generic:resolute-local \
+  . 2&gt;&amp;1 | tee /tmp/buildimage-generic-resolute.log</code></pre>
+  <p>This image is large and the initial build can take a long time. Docker caches successful layers; rerunning after a transient failure generally resumes from cached work.</p>
+  <pre><code>docker image inspect buildimage-generic:resolute-local \
+  --format 'id={{.Id}} size={{.Size}} bytes'
+
+docker run --rm buildimage-generic:resolute-local \
+  bash -lc 'test -r /opt/setupenv.sh &amp;&amp; \
+    test -f /opt/qt/6.11.1/gcc_64/lib/cmake/Qt6/Qt6Config.cmake &amp;&amp; \
+    echo "Resolute environment and Qt 6 are ready"'</code></pre>
+
+  <h2>Build the SpatialExplorer Qt GUI</h2>
+  <p>This reproduces the important Linux CI settings: GCC 14, <code>RelWithDebInfo</code>, the Resolute dependency image, and the GeographicLib CMake module path. Mapping your host UID/GID prevents root-owned files in the bind-mounted checkout.</p>
+  <pre><code>cd /home/mauricio/1playground/phusion
+
+docker run --rm \
+  --name spatialexplorer-gui-build \
+  --user "$(id -u):$(id -g)" \
+  -e HOME=/tmp/dev-home \
+  -v "$PWD:/phusion" \
+  -w /phusion \
+  buildimage-generic:resolute-local \
+  bash -lc '
+    mkdir -p "$HOME"
+    cmake -S spatialexplorer -B build-gui -G Ninja \
+      -DCMAKE_BUILD_TYPE=RelWithDebInfo \
+      -DCMAKE_CXX_COMPILER=g++-14 \
+      -DCMAKE_C_COMPILER=gcc-14 \
+      -DLICENSING_ALLOW_ALL_FEATURES=ON \
+      -DCMAKE_MODULE_PATH=/usr/share/cmake/geographiclib
+    cmake --build build-gui --target SpatialExplorer -j"$(nproc)"
+  '</code></pre>
+  <p>A successful initial build ends with <code>Linking CXX executable SpatialExplorer</code>. The result is:</p>
+  <pre><code>/home/mauricio/1playground/phusion/build-gui/SpatialExplorer</code></pre>
+  <p><code>RelWithDebInfo</code> keeps debugging information, so the executable can be several gigabytes.</p>
+
+  <h2>Your everyday edit–build loop</h2>
+  <ol class="steps">
+    <li><strong>Edit the Phusion source on the host.</strong>Use Neovim, Qt Creator, VS Code, or another editor in <code>/home/mauricio/1playground/phusion</code>.</li>
+    <li><strong>Run the incremental build.</strong>The existing <code>build-gui/</code> tree retains configuration and object files, so there is no need to rebuild the dependency image unless its Dockerfile changed.</li>
+    <li><strong>Launch SpatialExplorer in the container.</strong>The binary depends on the image’s Qt and <code>/opt</code> libraries, so do not expect it to run directly on an unrelated host installation.</li>
+    <li><strong>Debug, adjust, repeat.</strong>Build output remains owned by your user because the container uses your numeric UID/GID.</li>
+  </ol>
+  <p>Fast incremental build command:</p>
+  <pre><code>cd /home/mauricio/1playground/phusion
+
+docker run --rm \
+  --name spatialexplorer-gui-build \
+  --user "$(id -u):$(id -g)" \
+  -e HOME=/tmp/dev-home \
+  -v "$PWD:/phusion" -w /phusion \
+  buildimage-generic:resolute-local \
+  bash -lc 'mkdir -p "$HOME" &amp;&amp; cmake --build build-gui --target SpatialExplorer -j"$(nproc)"'</code></pre>
+
+  <h2>Run the GUI on this Ubuntu desktop</h2>
+  <p>This machine has an XWayland display at <code>DISPLAY=:0</code>. Pass the X11 socket and current Xauthority cookie into the container. Host networking supports services the application may contact, and extra shared memory helps Qt WebEngine.</p>
+  <pre><code>cd /home/mauricio/1playground/phusion
+
+docker run --rm -it \
+  --name spatialexplorer-gui \
+  --user "$(id -u):$(id -g)" \
+  --network host \
+  --shm-size=1g \
+  -e HOME=/tmp/dev-home \
+  -e DISPLAY="$DISPLAY" \
+  -e XAUTHORITY=/tmp/.Xauthority \
+  -v "$XAUTHORITY:/tmp/.Xauthority:ro" \
+  -v /tmp/.X11-unix:/tmp/.X11-unix:rw \
+  -v "$PWD:/phusion" \
+  -w /phusion \
+  buildimage-generic:resolute-local \
+  bash -lc 'mkdir -p "$HOME" &amp;&amp; exec ./build-gui/SpatialExplorer'</code></pre>
+  <p>Keep the launching terminal open. Press <code>Ctrl+C</code> there to terminate the application if closing its window does not return to the prompt.</p>
+
+  <h2>Other useful targets</h2>
+  <div class="scroll">
+    <table>
+      <thead><tr><th>Goal</th><th>Command inside the development container</th></tr></thead>
+      <tbody>
+        <tr><td>GUI</td><td><code>cmake --build build-gui --target SpatialExplorer -j"$(nproc)"</code></td></tr>
+        <tr><td>Headless core</td><td><code>cmake --build build-gui --target SpatialExplorerCore -j"$(nproc)"</code></td></tr>
+        <tr><td>Compatibility allocator</td><td><code>cmake --build build-gui --target SpatialExplorer-Compatibility -j"$(nproc)"</code></td></tr>
+        <tr><td>mimalloc variant</td><td><code>cmake --build build-gui --target SpatialExplorer-mimalloc -j"$(nproc)"</code></td></tr>
+        <tr><td>Tests</td><td><code>cmake --build build-gui --target check -j"$(nproc)"</code></td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h2>Open an interactive development shell</h2>
+  <p>Use this when you want to explore dependencies, run CMake manually, inspect linked libraries, or use GDB:</p>
+  <pre><code>cd /home/mauricio/1playground/phusion
+
+docker run --rm -it \
+  --name phusion-dev \
+  --user "$(id -u):$(id -g)" \
+  -e HOME=/tmp/dev-home \
+  -v "$PWD:/phusion" \
+  -w /phusion \
+  buildimage-generic:resolute-local \
+  bash</code></pre>
+  <p>The image sets <code>BASH_ENV=/opt/setupenv.sh</code>, which adds Qt and the custom dependencies to paths such as <code>CMAKE_PREFIX_PATH</code> and <code>LD_LIBRARY_PATH</code>.</p>
+
+  <h2>Troubleshooting</h2>
+  <div class="two">
+    <section class="box"><h3>Qt6 cannot be found</h3><p>Run <code>docker run --rm buildimage-generic:resolute-local ls -l /opt/setupenv.sh</code>. It must be readable, normally <code>-rw-r--r--</code>. Recheck the Resolute permission fix and rebuild the image.</p></section>
+    <section class="box"><h3>Docker permission denied</h3><p>Run <code>id</code> and confirm the <code>docker</code> group is present in the current login session. Group changes require a new login or reboot.</p></section>
+    <section class="box"><h3>Private Git clone fails</h3><p>Confirm <code>ssh-add -l</code> lists the Phoenix key, <code>ssh -T git@gitlab.com</code> succeeds, and the image build includes <code>--ssh default</code>.</p></section>
+    <section class="box"><h3>GUI cannot connect to display</h3><p>Confirm <code>DISPLAY</code> and <code>XAUTHORITY</code> are nonempty and that the Xauthority file exists. Log out/in if the desktop session changed and left a stale value.</p></section>
+    <section class="box"><h3>Files are owned by root</h3><p>Do not omit <code>--user "$(id -u):$(id -g)"</code>. For an old root-owned build tree, repair ownership deliberately with <code>sudo chown -R "$USER:$USER" build-gui</code>.</p></section>
+    <section class="box"><h3>A rebuild behaves strangely</h3><p>First rerun CMake configuration. If a genuinely incompatible toolchain change requires a clean build, move the old <code>build-gui</code> aside rather than deleting it immediately.</p></section>
+  </div>
+  <div class="callout danger">
+    <strong>Do not solve every problem with root.</strong>
+    <p>Root inside a container can write root-owned files into bind mounts. It can also hide image permission bugs, as happened with <code>setupenv.sh</code>. Prefer your host UID/GID for development builds.</p>
+  </div>
+
+  <section class="check">
+    <h2>Success checklist</h2>
+    <ul>
+      <li><code>docker run --rm hello-world</code> works without <code>sudo</code>.</li>
+      <li><code>buildimage-generic</code> is on the <code>resolute</code> branch.</li>
+      <li><code>/opt/setupenv.sh</code> is readable in the local image.</li>
+      <li>Phusion submodules are initialized recursively.</li>
+      <li>The build ends at <code>[1493/1493] Linking CXX executable SpatialExplorer</code> (the exact step count can change).</li>
+      <li><code>build-gui/SpatialExplorer</code> exists and is owned by your user.</li>
+      <li>The X11-enabled Docker command opens the application on the host desktop.</li>
+    </ul>
+  </section>
+
+  <p class="source">Validated on this workstation on September 3–4, 2026. Sources of truth: the <code>resolute</code> Dockerfile in <code>buildimage-generic</code>, the Linux SpatialExplorer job in Phusion’s <code>.gitlab-ci.yml</code>, and <code>spatialexplorer/CMakeLists.txt</code>.</p>
+</main>
+</body>
+</html>

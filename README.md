@@ -11,3 +11,10 @@ python3 -m http.server 8000
 ```
 
 Then open <http://localhost:8000>.
+
+## Guides
+
+- Building Yocto images
+- Herdr, from zero
+- Neovim: basic to fluent
+- Phusion development with Docker
