@@ -1,0 +1,199 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="A practical, digestible guide to Phusion C++ and Qt coding standards">
+  <title>Phusion coding style, without the wall of rules</title>
+  <style>
+    :root { color-scheme:dark; --bg:#090d14; --panel:#121925; --panel2:#172131; --text:#edf2fa; --muted:#aab5c5; --line:#2b394c; --mint:#79dbc1; --blue:#82b4ff; --amber:#f5c36b; --red:#ff8d8d; --good:#9be39b; }
+    * { box-sizing:border-box; }
+    html { scroll-behavior:smooth; }
+    body { margin:0; font:16px/1.62 system-ui,-apple-system,"Segoe UI",sans-serif; color:var(--text); background:radial-gradient(circle at 80% 0,#18322f 0,transparent 34rem),var(--bg); }
+    main { width:min(1080px,100%); margin:auto; padding:32px 20px 90px; }
+    nav { display:flex; flex-wrap:wrap; gap:10px; margin-bottom:52px; }
+    nav a,.pill { padding:7px 11px; border:1px solid var(--line); border-radius:999px; color:var(--muted); text-decoration:none; font-size:.87rem; }
+    nav a:hover { color:var(--text); border-color:var(--mint); }
+    .eyebrow { color:var(--mint); font-weight:800; letter-spacing:.15em; text-transform:uppercase; }
+    h1 { max-width:850px; margin:.18em 0; font-size:clamp(2.7rem,7vw,5.5rem); line-height:.98; letter-spacing:-.055em; }
+    h2 { margin:2.2em 0 .65em; font-size:clamp(1.8rem,4vw,2.7rem); letter-spacing:-.03em; }
+    h3 { margin:1.4em 0 .5em; }
+    p { max-width:76ch; }
+    .lead { color:var(--muted); font-size:1.18rem; }
+    .callout,.card { border:1px solid var(--line); border-radius:15px; background:color-mix(in srgb,var(--panel) 95%,transparent); padding:20px; }
+    .callout { margin:26px 0; border-left:4px solid var(--amber); }
+    .grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:15px; }
+    .rule { display:grid; grid-template-columns:42px 1fr; gap:12px; }
+    .rule strong:first-child { display:grid; place-items:center; align-self:start; width:38px; height:38px; border-radius:10px; color:#06241d; background:var(--mint); }
+    .rule p { margin:.25em 0 0; color:var(--muted); }
+    table { width:100%; border-collapse:collapse; overflow:hidden; border:1px solid var(--line); border-radius:12px; }
+    th,td { padding:12px 14px; border-bottom:1px solid var(--line); text-align:left; vertical-align:top; }
+    th { color:var(--mint); background:var(--panel2); }
+    td:first-child { white-space:nowrap; }
+    code,pre { font-family:"SFMono-Regular",Consolas,monospace; }
+    code { padding:.12em .35em; border-radius:4px; color:#fff; background:#202b3c; }
+    pre { overflow:auto; margin:12px 0 0; padding:17px; border:1px solid var(--line); border-radius:10px; background:#080c12; font-size:.9rem; line-height:1.55; }
+    pre code { padding:0; background:none; }
+    .bad { color:var(--red); } .good { color:var(--good); }
+    li { margin:.4em 0; }
+    .checklist { list-style:none; padding:0; }
+    .checklist li { position:relative; padding-left:30px; }
+    .checklist li::before { content:"□"; position:absolute; left:3px; color:var(--mint); font-size:1.2rem; }
+    footer { margin-top:60px; padding-top:22px; border-top:1px solid var(--line); color:var(--muted); }
+    @media(max-width:720px){ .grid{grid-template-columns:1fr} td:first-child{white-space:normal} table{font-size:.9rem} }
+  </style>
+</head>
+<body>
+<main>
+  <nav aria-label="Guide navigation">
+    <a href="index.html">← All guides</a><a href="#golden-rules">Golden rules</a><a href="#examples">Examples</a><a href="#workflow">Workflow</a><a href="#checklist">Checklist</a>
+  </nav>
+
+  <div class="eyebrow">Phusion field guide</div>
+  <h1>Coding style, without the wall of rules</h1>
+  <p class="lead">The rules you are most likely to need while writing C++ and Qt code. Use this to develop good instincts, then consult the repository documents when a detail matters.</p>
+
+  <div class="callout">
+    <strong>Which rule wins?</strong>
+    <ol>
+      <li>The current task and reviewer direction.</li>
+      <li>The repository's current <code>CLAUDE.md</code> and <code>docs/standards/</code>.</li>
+      <li>The repository's <code>.clang-format</code>.</li>
+      <li>The internal Coding Standards wiki and <a href="https://wiki.qt.io/Qt_Coding_Style">Qt Coding Style</a>.</li>
+    </ol>
+    <p>The wiki still mentions C++17. The current repository says <strong>C++23</strong>, so C++23 is the rule. Likewise, let <code>.clang-format</code> settle formatting disagreements.</p>
+  </div>
+
+  <section id="golden-rules">
+    <h2>The golden 12</h2>
+    <div class="grid">
+      <article class="card rule"><strong>1</strong><div><strong>Be explicit.</strong><p>Readable, unsurprising code normally beats compressed or clever code. Clever code needs both a technical reason and a useful reference.</p></div></article>
+      <article class="card rule"><strong>2</strong><div><strong>Use exact-width integers.</strong><p>Write <code>int32_t</code>, <code>uint16_t</code>, and friends. Do not use <code>int</code> or Qt's <code>qint*</code> aliases.</p></div></article>
+      <article class="card rule"><strong>3</strong><div><strong>Avoid <code>auto</code>.</strong><p>Spell out meaningful types. Never bind an Eigen expression to <code>auto</code>; use a concrete Eigen type or call <code>.eval()</code>.</p></div></article>
+      <article class="card rule"><strong>4</strong><div><strong>Make units visible.</strong><p>Use typed wrappers and named conversions such as <code>Angled::fromRadians(x).toDegrees()</code>. Do not hand-roll conversion ratios.</p></div></article>
+      <article class="card rule"><strong>5</strong><div><strong>Use <code>const</code>.</strong><p>Apply it to methods, parameters, and locals when possible. Do not return <code>const T</code> by value.</p></div></article>
+      <article class="card rule"><strong>6</strong><div><strong>Prefer references.</strong><p>Use a pointer only when null is meaningful or an API requires one. Use smart pointers for ownership.</p></div></article>
+      <article class="card rule"><strong>7</strong><div><strong>Name behavior.</strong><p>No default arguments. Avoid boolean behavior switches; use a small enum. A single-property setter may take a bool.</p></div></article>
+      <article class="card rule"><strong>8</strong><div><strong>Keep records labeled.</strong><p>Small data-only structs should remain aggregates with typed members. Construct them with C++23 designated initializers.</p></div></article>
+      <article class="card rule"><strong>9</strong><div><strong>Fail loudly.</strong><p>Do not replace a throw, assert, or strict parse with a silent fallback. Throw <code>std::runtime_error</code>; include <code>QFile::errorString()</code> for file failures.</p></div></article>
+      <article class="card rule"><strong>10</strong><div><strong>Use modern iteration.</strong><p>Prefer range loops and standard algorithms when the index has no meaning. Never use a default-reference lambda capture such as <code>[&amp;]</code>.</p></div></article>
+      <article class="card rule"><strong>11</strong><div><strong>Comment the why.</strong><p>Document purpose, assumptions, units, edge cases, and non-obvious decisions. Do not narrate the syntax or leave project-phase commentary behind.</p></div></article>
+      <article class="card rule"><strong>12</strong><div><strong>Format mechanically.</strong><p>Four spaces, a 120-column limit, and the repository formatter. Do not spend judgment on spacing that the tool owns.</p></div></article>
+    </div>
+  </section>
+
+  <section id="examples">
+    <h2>Patterns you will use</h2>
+
+    <h3>Types, construction, and units</h3>
+    <pre><code><span class="bad">// Avoid: vague types, positional slots, and raw unit math</span>
+auto orientation = EulerAngles(yaw, pitch, roll);
+double degrees = radians * 180.0 / M_PI;
+
+<span class="good">// Prefer: explicit types, labeled fields, and named unit conversion</span>
+const EulerAngle3::YawPitchRoll&lt;double&gt; orientation{
+    .yaw = yaw,
+    .pitch = pitch,
+    .roll = roll,
+};
+const double degrees = Angled::fromRadians(radians).toDegrees();</code></pre>
+
+    <h3>Function interfaces</h3>
+    <pre><code><span class="bad">// Avoid: the call site cannot explain true or the omitted value</span>
+void exportCloud(bool compact, int quality = 4);
+exportCloud(true);
+
+<span class="good">// Prefer: the call site says what it means</span>
+enum class CloudLayout { compact, full };
+void exportCloud(CloudLayout layout, int32_t quality);
+exportCloud(CloudLayout::compact, 4);</code></pre>
+
+    <h3>Loops and captures</h3>
+    <pre><code><span class="bad">// Avoid</span>
+for (size_t i = 0; i &lt; receptors.size(); ++i) {
+    process(receptors[i]);
+}
+runAsync([&amp;] { update(result); });
+
+<span class="good">// Prefer</span>
+for (const CameraReceptor &amp;receptor : receptors)
+    process(receptor);
+runAsync([this, &amp;result] { update(result); });</code></pre>
+
+    <h3>Error handling</h3>
+    <pre><code><span class="bad">// Avoid: execution continues after an invalid state</span>
+if (!file.open(QIODevice::ReadOnly)) {
+    TRACE("open failed");
+    return {};
+}
+
+<span class="good">// Prefer: preserve the useful failure reason</span>
+if (!file.open(QIODevice::ReadOnly))
+    throw std::runtime_error(
+        QString("cannot open %1 for reading: %2")
+            .arg(file.fileName(), file.errorString()).toStdString());</code></pre>
+
+    <h3>Naming and file conventions</h3>
+    <table>
+      <thead><tr><th>Thing</th><th>Use</th><th>Avoid</th></tr></thead>
+      <tbody>
+        <tr><td>Private member</td><td><code>mIsInitialized</code></td><td><code>isInitialized_</code></td></tr>
+        <tr><td>Public struct field</td><td><code>isInitialized</code></td><td><code>mIsInitialized</code></td></tr>
+        <tr><td>Namespace</td><td><code>mysensor</code></td><td><code>MySensor</code></td></tr>
+        <tr><td>New filename</td><td><code>imusample.h</code></td><td><code>imuSample.h</code></td></tr>
+        <tr><td>Local header</td><td><code>#include "imusample.h"</code></td><td><code>#include &lt;imusample.h&gt;</code></td></tr>
+        <tr><td>Header guard</td><td><code>#pragma once</code></td><td><code>#ifndef ...</code></td></tr>
+        <tr><td>JSON API</td><td><code>toJson() const</code>, <code>loadFrom(...)</code></td><td>one-off names</td></tr>
+        <tr><td>Serializable enum</td><td><code>BaseEnum</code></td><td>plain enum</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section>
+    <h2>Documentation that helps</h2>
+    <ul>
+      <li>Explain why a class or struct exists and when it should be used.</li>
+      <li>For a method, document parameters, return value, valid ranges, units, preconditions, postconditions, and important edge cases.</li>
+      <li>Explain magic values and assumptions. For a workaround, include the issue reference and the technical reason.</li>
+      <li>Put comments above the code. Trailing comments are mainly for units or short row labels.</li>
+      <li>Write exception messages in lowercase, present tense, with no ending punctuation: <code>cannot open file foo.csv for reading</code>.</li>
+      <li>Write plainly to a colleague. Do not use em dashes, banner-divider comments, invented abstraction labels, or status narration such as “Phase 2 implementation.”</li>
+    </ul>
+  </section>
+
+  <section id="workflow">
+    <h2>From edit to merge request</h2>
+    <ol>
+      <li><strong>Start from the issue.</strong> Name the branch with the issue number followed by a short version of the issue title.</li>
+      <li><strong>Keep the change focused.</strong> Remove temporary notes and explain the final design, not the history of arriving there.</li>
+      <li><strong>Format changed C/C++ files.</strong><pre><code>clang-format -i path/to/file.cpp path/to/file.h</code></pre></li>
+      <li><strong>Build and test in the Resolute container.</strong> Use the Docker development guide for the exact mount and build commands.</li>
+      <li><strong>Review the diff.</strong><pre><code>git diff --check
+git diff</code></pre></li>
+      <li><strong>Commit in the imperative mood.</strong> Read the subject as: “If applied, this commit will …” Use your Phoenix LiDAR email identity.</li>
+      <li><strong>Open a merge request.</strong> Put the issue first in the title, for example <code>#1234 fix stale calibration display</code>. The pipeline must pass without new warnings.</li>
+    </ol>
+    <div class="callout">
+      <strong>Cloud and AI tools:</strong> the internal wiki warns against tools that submit source code to cloud services. Before using an AI assistant, cloud formatter, or cloud analyzer on company code, confirm the currently approved policy and configuration with your manager or security owner.
+    </div>
+  </section>
+
+  <section id="checklist">
+    <h2>The 60-second pre-review checklist</h2>
+    <ul class="checklist">
+      <li>No plain <code>int</code>, Qt integer aliases, unexplained <code>auto</code>, or Eigen expressions bound to <code>auto</code>.</li>
+      <li>Units use typed wrappers and named conversions; persisted or network structs have a <code>static_assert</code> on size.</li>
+      <li>No default arguments, ambiguous boolean switches, raw owning pointers, C-style casts, <code>qBound</code>, or default-reference lambda captures.</li>
+      <li>Members are initialized at declaration; nullable pointers start at <code>nullptr</code>; everything reasonable is <code>const</code>.</li>
+      <li>Failures are visible and actionable; every <code>QFile</code> error reports <code>errorString()</code>.</li>
+      <li>Comments explain purpose and decisions, not syntax, phases, or the process that produced the code.</li>
+      <li><code>clang-format</code>, the build, relevant tests, and <code>git diff --check</code> pass.</li>
+    </ul>
+  </section>
+
+  <footer>
+    Condensed from the Phusion internal Coding Standards wiki and the repository's current <code>CLAUDE.md</code>, <code>.clang-format</code>, and prose standards. Checked 2026-09-04. This is a learning aid; the current repository remains authoritative.
+  </footer>
+</main>
+</body>
+</html>
