@@ -1,0 +1,256 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="A practical guide to Qt development in Phusion and SpatialExplorer">
+  <title>Qt development in Phusion</title>
+  <style>
+    :root { color-scheme:dark; --bg:#090d14; --panel:#121925; --panel2:#172131; --text:#edf2fa; --muted:#aab5c5; --line:#2b394c; --mint:#79dbc1; --blue:#82b4ff; --amber:#f5c36b; --red:#ff9393; --green:#9be39b; }
+    * { box-sizing:border-box; }
+    html { scroll-behavior:smooth; }
+    body { margin:0; font:16px/1.62 system-ui,-apple-system,"Segoe UI",sans-serif; color:var(--text); background:radial-gradient(circle at 82% 0,#18322f 0,transparent 34rem),radial-gradient(circle at 0 52%,#18203b 0,transparent 28rem),var(--bg); }
+    main { width:min(1080px,100%); margin:auto; padding:32px 20px 90px; }
+    nav { display:flex; flex-wrap:wrap; gap:10px; margin-bottom:52px; }
+    nav a { padding:7px 11px; border:1px solid var(--line); border-radius:999px; color:var(--muted); text-decoration:none; font-size:.87rem; }
+    nav a:hover { color:var(--text); border-color:var(--mint); }
+    .eyebrow { color:var(--mint); font-weight:800; letter-spacing:.15em; text-transform:uppercase; }
+    h1 { max-width:850px; margin:.18em 0; font-size:clamp(2.8rem,7vw,5.6rem); line-height:.98; letter-spacing:-.055em; }
+    h2 { margin:2.15em 0 .65em; font-size:clamp(1.8rem,4vw,2.7rem); letter-spacing:-.03em; }
+    h3 { margin:1.5em 0 .5em; }
+    p { max-width:78ch; }
+    .lead { color:var(--muted); font-size:1.18rem; }
+    .callout,.card { border:1px solid var(--line); border-radius:15px; background:color-mix(in srgb,var(--panel) 95%,transparent); padding:20px; }
+    .callout { margin:25px 0; border-left:4px solid var(--amber); }
+    .grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:14px; }
+    .card h3 { margin:0 0 .3em; color:var(--mint); }
+    .card p { margin:0; color:var(--muted); }
+    .flow { display:grid; grid-template-columns:repeat(4,1fr); gap:10px; margin:20px 0; }
+    .flow div { position:relative; padding:16px; border:1px solid var(--line); border-radius:11px; background:var(--panel); text-align:center; }
+    .flow strong { display:block; color:var(--mint); }
+    table { width:100%; border-collapse:collapse; border:1px solid var(--line); }
+    th,td { padding:12px 14px; border-bottom:1px solid var(--line); text-align:left; vertical-align:top; }
+    th { color:var(--mint); background:var(--panel2); }
+    code,pre { font-family:"SFMono-Regular",Consolas,monospace; }
+    code { padding:.12em .35em; border-radius:4px; color:#fff; background:#202b3c; }
+    pre { overflow:auto; padding:17px; border:1px solid var(--line); border-radius:10px; background:#080c12; font-size:.89rem; line-height:1.55; }
+    pre code { padding:0; background:none; }
+    .bad { color:var(--red); } .good { color:var(--green); }
+    li { margin:.42em 0; }
+    .checklist { list-style:none; padding:0; }
+    .checklist li { position:relative; padding-left:30px; }
+    .checklist li::before { content:"□"; position:absolute; left:3px; color:var(--mint); font-size:1.2rem; }
+    footer { margin-top:60px; padding-top:22px; border-top:1px solid var(--line); color:var(--muted); }
+    a { color:var(--blue); }
+    @media(max-width:800px){ .grid{grid-template-columns:1fr}.flow{grid-template-columns:1fr 1fr} }
+    @media(max-width:500px){ .flow{grid-template-columns:1fr} table{font-size:.9rem} }
+  </style>
+</head>
+<body>
+<main>
+  <nav aria-label="Guide navigation"><a href="index.html">← All guides</a><a href="#mental-model">Mental model</a><a href="#dialog">Add a dialog</a><a href="#signals">Signals</a><a href="#threads">Threads</a><a href="#debug">Debugging</a></nav>
+
+  <div class="eyebrow">SpatialExplorer field guide</div>
+  <h1>Qt development in Phusion</h1>
+  <p class="lead">A working map of the Qt concepts you need to change SpatialExplorer confidently. This guide follows the repository as it exists: Qt 6.5+, C++23, CMake, Qt Widgets, Designer forms, and a large event-driven desktop application.</p>
+
+  <div class="callout"><strong>Keep both companion guides nearby.</strong> Use <a href="phusion-docker-development-guide.html">Phusion with Docker</a> for the build and runtime environment, and <a href="phusion-coding-style-guide.html">Phusion coding style</a> for project-specific C++ rules. This page teaches the Qt layer.</div>
+
+  <section id="mental-model">
+    <h2>The mental model</h2>
+    <div class="grid">
+      <article class="card"><h3>The event loop</h3><p><code>QApplication::exec()</code> waits for mouse, keyboard, timer, socket, and queued-signal events. A long slot blocks all GUI activity.</p></article>
+      <article class="card"><h3>QObject</h3><p>Qt's runtime object: identity, parent ownership, properties, signals, slots, thread affinity, and deferred deletion.</p></article>
+      <article class="card"><h3>QWidget</h3><p>A visible QObject. SpatialExplorer composes dialogs, dock widgets, toolbars, views, and custom OpenGL widgets.</p></article>
+      <article class="card"><h3>Signals and slots</h3><p>Typed event delivery between objects. The sender announces; receivers choose how to react.</p></article>
+      <article class="card"><h3>Meta-object compiler</h3><p><code>moc</code> generates support for <code>Q_OBJECT</code>. CMake's <code>AUTOMOC</code> runs it for repository targets.</p></article>
+      <article class="card"><h3>Designer and uic</h3><p>A <code>.ui</code> file describes a widget tree. <code>uic</code> generates <code>ui_name.h</code>; never edit that generated header.</p></article>
+    </div>
+
+    <div class="flow" aria-label="Typical Qt event flow">
+      <div><strong>User</strong>clicks a button</div><div><strong>Signal</strong><code>clicked()</code></div><div><strong>Slot</strong>validates and acts</div><div><strong>UI</strong>updates or shows error</div>
+    </div>
+
+    <h3>Where things live in Phusion</h3>
+    <table>
+      <thead><tr><th>Area</th><th>Role</th></tr></thead>
+      <tbody>
+        <tr><td><code>spatialexplorer/*.ui</code></td><td>Designer forms for dialogs, dock widgets, and reusable widgets.</td></tr>
+        <tr><td><code>spatialexplorer/*.h/.cpp</code></td><td>Widget behavior, signal connections, state, application logic, OpenGL rendering, and entry points.</td></tr>
+        <tr><td><code>spatialexplorer/embeddedfiles.qrc</code></td><td>Resources compiled into the executable and addressed with paths such as <code>:/icon.ico</code>.</td></tr>
+        <tr><td><code>spatialexplorer/CMakeLists.txt</code></td><td>Qt modules, source lists, UI processing, resources, executable targets, and tests.</td></tr>
+        <tr><td><code>common/</code></td><td>Shared domain and GUI support used by SpatialExplorer and other executables.</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section id="dialog">
+    <h2>Your first real task: change or add a dialog</h2>
+    <ol>
+      <li>Find a nearby dialog that behaves similarly. Use its structure, but do not copy legacy style violations.</li>
+      <li>Edit the <code>.ui</code> form in Qt Designer. Give widgets descriptive object names such as <code>pushButtonImport</code> or <code>comboBoxCoordinateSystem</code>.</li>
+      <li>Create or update the matching lowercase <code>.h</code> and <code>.cpp</code> files.</li>
+      <li>Make the class inherit the appropriate widget and add <code>Q_OBJECT</code> when it declares signals, slots, or other meta-object features.</li>
+      <li>Include the generated <code>ui_dialogname.h</code> only in the implementation file and call <code>ui-&gt;setupUi(this)</code>.</li>
+      <li>Connect UI signals using the typed function-pointer syntax.</li>
+      <li>Add new sources or special headers to the relevant CMake source list. Header-only <code>Q_OBJECT</code> classes must be listed so <code>AUTOMOC</code> sees them.</li>
+      <li>Build the narrowest target, run it, and exercise success, invalid input, cancel, close, and repeated-open paths.</li>
+    </ol>
+
+    <pre><code>// dialogimportsettings.h
+#pragma once
+
+#include &lt;QDialog&gt;
+
+namespace Ui { class DialogImportSettings; }
+
+class DialogImportSettings : public QDialog {
+    Q_OBJECT
+
+    Ui::DialogImportSettings *mUi = nullptr;
+
+  public:
+    explicit DialogImportSettings(QWidget *parent = nullptr);
+    ~DialogImportSettings() override;
+
+  signals:
+    void settingsImported(const QString &amp;fileName);
+};
+
+// dialogimportsettings.cpp
+#include "dialogimportsettings.h"
+#include "ui_dialogimportsettings.h"
+
+DialogImportSettings::DialogImportSettings(QWidget *parent)
+    : QDialog(parent), mUi(new Ui::DialogImportSettings) {
+    mUi-&gt;setupUi(this);
+    connect(mUi-&gt;pushButtonImport, &amp;QPushButton::clicked, this, [this] {
+        emit settingsImported(mUi-&gt;lineEditFileName-&gt;text());
+    });
+}
+
+DialogImportSettings::~DialogImportSettings() { delete mUi; }</code></pre>
+
+    <div class="callout"><strong>Ownership detail:</strong> widgets created by <code>setupUi()</code> become children of the dialog and Qt deletes them with the parent. The generated <code>Ui::...</code> helper itself is not a QObject, so a raw allocated helper must be deleted explicitly. Match the established pattern in the specific area you edit.</div>
+  </section>
+
+  <section id="signals">
+    <h2>Signals and slots you can reason about</h2>
+    <pre><code><span class="good">// Preferred: compile-time checked names and types</span>
+connect(mTimer, &amp;QTimer::timeout,
+        this, &amp;SensorWidget::refreshStatus);
+
+connect(mUi-&gt;checkBoxEnabled, &amp;QCheckBox::toggled,
+        this, [this](const bool enabled) {
+            mController.setEnabled(enabled);
+        });</code></pre>
+    <ul>
+      <li>A signal is a notification, not a command. Name it for what happened: <code>settingsChanged</code>, not <code>doUpdateSettings</code>.</li>
+      <li>Give a context object for lambdas, normally <code>this</code>. Qt then disconnects the lambda when the context is destroyed.</li>
+      <li>Capture only what the lambda needs. Phusion lint rejects <code>[&amp;]</code>; write <code>[this, &amp;result]</code> or capture a safe value.</li>
+      <li>Use <code>QOverload&lt;...&gt;::of(...)</code> when a Qt signal is overloaded.</li>
+      <li>A connection does not copy the receiver's lifetime. Be especially careful when a lambda captures raw pointers or references to short-lived locals.</li>
+      <li>Let <code>Qt::AutoConnection</code> handle ordinary same-thread connections. Specify a connection type when thread behavior is intentional.</li>
+    </ul>
+  </section>
+
+  <section id="threads">
+    <h2>Threading: the rule that prevents most crashes</h2>
+    <div class="callout"><strong>Only the GUI thread touches widgets.</strong> Never read or mutate a QWidget from a worker thread. Send data back with a queued signal or <code>QMetaObject::invokeMethod(..., Qt::QueuedConnection)</code>.</div>
+    <p>A QObject “lives” in one thread. Its queued slots run through that thread's event loop. Moving a worker object with <code>moveToThread()</code> changes its affinity; the <code>QThread</code> object itself still lives in the thread that created it.</p>
+    <pre><code>QThread *thread = new QThread(this);
+Worker *worker = new Worker;             // no parent, so it can move
+worker-&gt;moveToThread(thread);
+
+connect(thread, &amp;QThread::started, worker, &amp;Worker::process);
+connect(worker, &amp;Worker::progress, this, &amp;ProgressDialog::setProgress,
+        Qt::QueuedConnection);
+connect(worker, &amp;Worker::finished, thread, &amp;QThread::quit);
+connect(worker, &amp;Worker::finished, worker, &amp;QObject::deleteLater);
+connect(thread, &amp;QThread::finished, thread, &amp;QObject::deleteLater);
+thread-&gt;start();</code></pre>
+    <ul>
+      <li>Do not run expensive LiDAR processing, blocking I/O, or long loops in a GUI slot.</li>
+      <li>Create timers and sockets in the thread where they will be used.</li>
+      <li>Use <code>deleteLater()</code> for a QObject owned by another running event loop.</li>
+      <li>A direct connection across threads executes in the emitter's thread and is usually unsafe. Treat it as an exceptional, documented choice.</li>
+      <li>A blocking queued connection can deadlock. Never use it between objects in the same thread.</li>
+    </ul>
+  </section>
+
+  <section>
+    <h2>Ownership, lifetime, and pointers</h2>
+    <ul>
+      <li>When you create a QObject with a parent, the parent deletes it. This is why <code>new QTimer(this)</code> is normal Qt code.</li>
+      <li>Do not combine parent ownership with a second owning smart pointer.</li>
+      <li>A raw pointer to a parent-owned widget is non-owning. Initialize it to <code>nullptr</code> and make the ownership obvious.</li>
+      <li>Use <code>QPointer&lt;T&gt;</code> when a non-owning QObject pointer can outlive the object; it becomes null when the object is destroyed.</li>
+      <li>For non-QObject ownership, follow ordinary C++: values first, then <code>std::unique_ptr</code>, and <code>std::shared_ptr</code> only for genuine shared lifetime.</li>
+      <li>A modal stack dialog such as <code>QMessageBox box(this)</code> is fine. A heap dialog should have a clear parent or explicit owner.</li>
+    </ul>
+  </section>
+
+  <section>
+    <h2>Models, views, and delegates</h2>
+    <p>For a tiny, local list, a convenience widget such as <code>QListWidget</code> can be enough. For domain data, large tables, shared data, sorting, filtering, or more than one presentation, use the model/view family.</p>
+    <table>
+      <thead><tr><th>Responsibility</th><th>Qt piece</th><th>Question it answers</th></tr></thead>
+      <tbody>
+        <tr><td>Data and roles</td><td><code>QAbstractItemModel</code>, <code>QStandardItemModel</code></td><td>What exists, and what value does each cell expose?</td></tr>
+        <tr><td>Presentation</td><td><code>QTableView</code>, <code>QTreeView</code>, <code>QListView</code></td><td>How is the model navigated and displayed?</td></tr>
+        <tr><td>Cell rendering/editing</td><td><code>QStyledItemDelegate</code></td><td>How does one value look and how can it be edited?</td></tr>
+        <tr><td>Sorting/filtering</td><td><code>QSortFilterProxyModel</code></td><td>How do I transform a view without duplicating source data?</td></tr>
+      </tbody>
+    </table>
+    <p>When a model changes, use the correct begin/end notification pair or emit the appropriate <code>dataChanged</code> range. A view cannot infer that your backing container changed.</p>
+  </section>
+
+  <section>
+    <h2>CMake and generated-code traps</h2>
+    <ul>
+      <li>SpatialExplorer requires Qt 6.5 or newer and links modules including Core, Gui, Widgets, OpenGL, Network, Sql, Svg, Concurrent, Test, Multimedia, and WebEngineWidgets.</li>
+      <li>Do not edit <code>ui_*.h</code>, <code>moc_*.cpp</code>, or generated resource files. Change their source files.</li>
+      <li>If adding <code>Q_OBJECT</code> produces “undefined reference to vtable,” first confirm the header is visible to <code>AUTOMOC</code> and is in the target's source list.</li>
+      <li>If <code>ui_dialog.h</code> is missing, confirm the <code>.ui</code> file is in <code>FILELIST_UI_AUTO</code> or the relevant UI list, then rerun CMake.</li>
+      <li>If a resource path fails, inspect <code>embeddedfiles.qrc</code> and use the compiled resource prefix, not a source-tree filesystem path.</li>
+      <li>Link a new Qt API through its target, for example <code>Qt6::Network</code>. Including a header alone does not link the module.</li>
+    </ul>
+  </section>
+
+  <section id="debug">
+    <h2>A debugging ladder</h2>
+    <ol>
+      <li><strong>Read the first build error.</strong> Generated-code failures often cause a page of secondary errors.</li>
+      <li><strong>Check the object name.</strong> If <code>mUi-&gt;button</code> is missing, inspect the widget's Designer <code>objectName</code>.</li>
+      <li><strong>Verify the connection.</strong> Store the returned <code>QMetaObject::Connection</code> or assert the result when diagnosing a suspicious connection.</li>
+      <li><strong>Verify the thread.</strong> Compare <code>QThread::currentThread()</code> with <code>object-&gt;thread()</code>.</li>
+      <li><strong>Inspect ownership.</strong> Use <code>dumpObjectTree()</code> and <code>dumpObjectInfo()</code> when widgets disappear, leak, or receive events unexpectedly.</li>
+      <li><strong>Check the event loop.</strong> If the window freezes, pause in the debugger and find the long-running GUI-thread call.</li>
+      <li><strong>Reduce the path.</strong> Reproduce with the smallest dialog, data file, or action sequence before changing architecture.</li>
+    </ol>
+  </section>
+
+  <section>
+    <h2>Practice path</h2>
+    <ol>
+      <li>Change text or layout in one existing <code>.ui</code> file, rebuild, and find the result.</li>
+      <li>Add a button and connect its signal to a short lambda.</li>
+      <li>Add a field, validate it, and show a useful <code>QMessageBox</code> on invalid input.</li>
+      <li>Trace an existing signal from emitter to receiver and identify the connection type.</li>
+      <li>Find one worker object and diagram its thread affinity, startup, result delivery, and deletion.</li>
+      <li>Add or modify a small model-backed view and test its change notifications.</li>
+    </ol>
+    <ul class="checklist">
+      <li>The GUI remains responsive during work.</li>
+      <li>Every QObject has understandable ownership and thread affinity.</li>
+      <li>Connections use typed syntax, a context object, and explicit safe captures.</li>
+      <li>Generated files remain untouched and CMake knows about new sources.</li>
+      <li>Error and cancel paths have been exercised, not just the happy path.</li>
+      <li>The change follows the Phusion coding-style checklist and passes the container build.</li>
+    </ul>
+  </section>
+
+  <footer>Based on the current Phusion repository and the official Qt documentation for <a href="https://doc.qt.io/qt-6/qtwidgets-index.html">Qt Widgets</a>, <a href="https://doc.qt.io/qt-6/objecttrees.html">object ownership</a>, <a href="https://doc.qt.io/qt-6/threads-qobject.html">threads and QObjects</a>, <a href="https://doc.qt.io/qt-6/modelview.html">model/view</a>, and <a href="https://doc.qt.io/qt-6/designer-using-a-ui-file.html">Designer UI files</a>. Checked 2026-09-04.</footer>
+</main>
+</body>
+</html>
