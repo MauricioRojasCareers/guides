@@ -1,0 +1,51 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="description" content="Time synchronization and timestamp integrity in SpatialRover"><title>SpatialRover time synchronization</title><link rel="stylesheet" href="rover-guide.css"></head><body><main>
+<nav><a href="index.html">← All guides</a><a href="spatialrover-start-here-guide.html">Start here</a><a href="#clocks">Clocks</a><a href="#rover">Rover flow</a><a href="#diagnose">Diagnose</a><a href="#read">Read next</a></nav>
+<div class="eyebrow">SpatialRover learning path · 2 of 4</div><h1>Time synchronization and timestamp integrity</h1><p class="lead">LiDAR points, IMU samples, GNSS poses, and camera exposures only align when their timestamps describe the same instant in a known time scale. “The clock looks right” is not enough.</p>
+
+<section id="clocks"><h2>First, name every clock</h2><div class="grid three">
+<article class="card"><h3>GNSS receiver time</h3><p>Provides absolute time and leap-second context. It becomes trustworthy only after the receiver reports an acceptable time status.</p></article>
+<article class="card"><h3>PPS</h3><p>A precise physical edge once per second. PPS supplies the boundary; a message stream supplies which second it was.</p></article>
+<article class="card"><h3>System clock</h3><p>Linux <code>CLOCK_REALTIME</code>. Calendar time can step or slew and is used by files, logs, and ordinary wall-clock timestamps.</p></article>
+<article class="card"><h3>Monotonic clock</h3><p>Elapsed-time clock that does not jump when calendar time is corrected. Use it for timeouts and durations.</p></article>
+<article class="card"><h3>RTC</h3><p>The battery-backed hardware clock used to seed time across boots. It is not the same as a NIC PTP hardware clock.</p></article>
+<article class="card"><h3>PHC</h3><p>A PTP hardware clock attached to a timestamp-capable NIC, often visible as <code>/dev/ptpN</code>.</p></article>
+</div>
+<div class="callout"><strong>Three different questions:</strong> synchronization asks whether clocks agree; timestamping asks where and when an event received its timestamp; alignment asks whether sensor timestamps map to the same time scale and physical event.</div></section>
+
+<section id="rover"><h2>SpatialRover's time flow</h2><div class="flow"><div><strong>GNSS packets</strong>time + status</div><div><strong><code>Nav</code></strong>requires repeated fine time</div><div><strong><code>HostClock</code></strong>step or slew system time</div><div><strong>RTC</strong>updated for a large offset</div></div>
+<div class="flow"><div><strong>GNSS serial + PPS</strong>absolute second</div><div><strong><code>i210_phc_sync</code></strong>discipline NIC PHCs</div><div><strong><code>ptp4l</code></strong>distribute PTP</div><div><strong>LiDAR clocks</strong>timestamp acquisition</div></div>
+<ul>
+<li><code>Nav::initialize()</code> listens for parser time and waits for consecutive fine-time reports before emitting <code>timeEstablished</code>.</li>
+<li><code>Rover</code> accepts the best time source and calls <code>HostClock::setSystemTime()</code> for GNSS time.</li>
+<li><code>HostClock</code> slews offsets below 10 ms with <code>adjtime()</code>, steps larger offsets with <code>settimeofday()</code>, and may update the RTC when the difference exceeds 10 seconds.</li>
+<li>A very large correction can trigger a controlled Rover restart so dataset names and startup-time assumptions are rebuilt using corrected time.</li>
+<li><code>PtpManager</code> enables PTP only for configured LiDARs that require or select it, maps sensor addresses to NICs, writes the embedded <code>ptp4l.conf</code>, and starts the PTP processes.</li>
+<li><code>Nav::slotSetOffsetUtcToGps()</code> checks the receiver's GPS/UTC leap-second offset against the time library.</li>
+</ul>
+<div class="callout danger"><strong>Clock-changing commands are disruptive.</strong> Never run <code>date -s</code>, <code>hwclock --systohc</code>, <code>phc_ctl ... set</code>, or an extra time daemon on a recording or production Rover. Stepping a clock can reorder logs and invalidate acquisition assumptions.</div></section>
+
+<section><h2>Vocabulary that prevents mistakes</h2><table><thead><tr><th>Term</th><th>Meaning</th><th>Symptom when wrong</th></tr></thead><tbody>
+<tr><td>Offset</td><td>Difference between two clocks at an instant.</td><td>Consistent displacement between sensors.</td></tr><tr><td>Drift / frequency error</td><td>Rate at which offset changes.</td><td>Alignment worsens through the mission.</td></tr><tr><td>Jitter</td><td>Short-term variation in timestamp or delivery timing.</td><td>Noisy timing even when average offset is small.</td></tr><tr><td>Latency</td><td>Delay between physical event, timestamp, transport, and processing.</td><td>Stable or load-dependent lag.</td></tr><tr><td>Step</td><td>Immediate clock jump.</td><td>Time goes forward or backward abruptly.</td></tr><tr><td>Slew</td><td>Gradual correction by changing clock rate.</td><td>Offset converges without a discontinuity.</td></tr><tr><td>UTC vs GPS vs TAI</td><td>Distinct time scales with different epoch/leap-second behavior.</td><td>Whole-second or epoch-scale error despite stable clocks.</td></tr></tbody></table></section>
+
+<section id="diagnose"><h2>Observe before changing</h2><p>These are read-only diagnostics on a designated development Rover:</p>
+<pre><code>date --iso-8601=ns
+timedatectl status
+hwclock --show
+ls -l /dev/pps* /dev/ptp* 2&gt;/dev/null
+find /sys/class/net -maxdepth 2 -name ptp -o -name device
+ethtool -T ethsensor0
+ps -ef | grep -E 'ptp4l|phc|rover'
+journalctl -u phoenix-rover --since '10 minutes ago'</code></pre>
+<ol><li>State the failing relationship: camera-to-GNSS, LiDAR-to-IMU, PHC-to-GNSS, or system-clock-to-GNSS.</li><li>Record the time scale and clock source for each endpoint.</li><li>Check physical signal presence and polarity before tuning software.</li><li>Check receiver time status and leap-second information.</li><li>Check NIC timestamp capability and map each interface to its PHC.</li><li>Read PTP servo state, offset, frequency adjustment, and path delay over time.</li><li>Compare behavior at boot, after lock, under load, and after reconnect.</li><li>Preserve logs and configuration before changing thresholds.</li></ol>
+<div class="callout"><strong>Interpret the pattern:</strong> constant offset suggests scale, epoch, cable, or configured-delay error. A ramp suggests frequency drift or a servo not locked. Random spikes suggest scheduling, buffering, network asymmetry, or timestamping too late in the path.</div></section>
+
+<section><h2>Code reading and exercises</h2><ol><li>Read <code>common/timepoint.h/.cpp</code>; list every supported time scale and named conversion.</li><li>Trace <code>ParserNav::time</code> into <code>Nav::timeEstablished</code>, then into <code>HostClock</code>.</li><li>Explain why Rover waits for fine time and why it treats small and large offsets differently.</li><li>Read <code>rover/ptpmanager.cpp</code> beside <code>rover/ptp4l.conf</code>; write down the source, sink, interface, transport, and delay mechanism.</li><li>Inspect <code>i210_phc_sync/</code> and draw where GNSS serial data and PPS enter the system.</li><li>Given an offset plot, classify it as constant offset, drift, jitter, or step before proposing a fix.</li></ol></section>
+
+<section id="read" class="reading"><h2>Proven references</h2><ul>
+<li><a href="https://www.kernel.org/doc/html/latest/driver-api/pps.html">Linux kernel: PPS</a> explains how precise edges become timestamped <code>/dev/ppsN</code> events.</li>
+<li><a href="https://docs.kernel.org/driver-api/ptp.html">Linux kernel: PTP hardware clocks</a> explains PHCs, external timestamp events, and PPS integration.</li>
+<li><a href="https://www.linuxptp.org/documentation/ptp4l/">linuxptp: ptp4l</a> is the authoritative option and time-scale reference for the daemon Rover launches.</li>
+<li><a href="https://www.linuxptp.org/documentation/phc2sys/">linuxptp: phc2sys</a> teaches the standard PHC/system-clock relationship, useful context even though Rover also has custom <code>i210_phc_sync</code>.</li>
+<li><a href="https://www.linuxptp.org/documentation/pmc/">linuxptp: pmc</a> shows how to query PTP datasets and port state.</li>
+<li><a href="https://www.nist.gov/pml/time-and-frequency-division/popular-links/time-frequency-z/time-and-frequency-z">NIST time and frequency glossary</a> is a dependable reference for offset, stability, UTC, and related terminology.</li>
+</ul></section><footer>Repository-grounded guide, checked 2026-09-04. Timing is a system property spanning wiring, receiver configuration, firmware, drivers, clocks, protocols, and application code. Diagnose the chain before editing one component.</footer></main></body></html>

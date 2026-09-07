@@ -1,0 +1,44 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="description" content="A first-week orientation to SpatialRover development"><title>SpatialRover: start here</title><link rel="stylesheet" href="rover-guide.css"></head><body><main>
+<nav><a href="index.html">← All guides</a><a href="#map">System map</a><a href="#lifecycle">Lifecycle</a><a href="#read">Reading path</a><a href="#week">First week</a></nav>
+<div class="eyebrow">SpatialRover learning path · 1 of 4</div><h1>SpatialRover: start here</h1>
+<p class="lead">SpatialRover is the embedded acquisition application. It runs without a desktop UI, talks to physical sensors, establishes time, records synchronized data, reports status, and shuts hardware down safely.</p>
+<div class="callout safe"><strong>Your boundary:</strong> concentrate on everything from a physical sensor through the embedded computer, storage, and network interface. SpatialExplorer is a client and debugging aid, not the center of this path.</div>
+
+<section id="map"><h2>The system map</h2><div class="flow"><div><strong>GNSS / PPS</strong>absolute time</div><div><strong>LiDAR / cameras</strong>measurements</div><div><strong>SpatialRover</strong>control + record</div><div><strong>/phoenix/logs</strong>datasets</div><div><strong>Network</strong>status + commands</div></div>
+<div class="grid three">
+<article class="card"><h3>Application</h3><p><code>rover/rover.cpp</code> owns startup, wiring, state, signal handling, recording managers, and coordinated shutdown.</p></article>
+<article class="card"><h3>Navigation</h3><p><code>nav.*</code> selects a receiver, parses GNSS/IMU data, determines fine time, and detects time/data problems.</p></article>
+<article class="card"><h3>Acquisition</h3><p><code>sensorcontroller*</code> configures sensors. <code>sensorrecorder*</code> and managers capture and write data.</p></article>
+<article class="card"><h3>Board control</h3><p><code>microcontroller.*</code> handles voltage, triggers, odometer and IMU samples, board identity, and firmware.</p></article>
+<article class="card"><h3>Time distribution</h3><p><code>hostclock.*</code> disciplines Linux clocks. <code>ptpmanager.*</code> manages PTP for LiDAR interfaces.</p></article>
+<article class="card"><h3>Operating system</h3><p>Yocto builds the image and package. systemd mounts storage, launches Rover as root, restarts failures, and imposes a stop timeout.</p></article>
+</div></section>
+
+<section id="lifecycle"><h2>What happens from boot to shutdown</h2>
+<ol><li><strong>Yocto-built Linux boots.</strong> Storage and networking come up.</li><li><strong>systemd starts <code>phoenix-rover.service</code>.</strong> Its pre-run helper performs update/setup work, then <code>/usr/bin/rover</code> starts.</li><li><strong><code>main()</code> creates one <code>Rover</code>.</strong> Because Rover derives from <code>QCoreApplication</code>, it owns the process event loop.</li><li><strong>The constructor wires the world.</strong> Settings, network services, microcontroller, timers, and startup gates are connected before recording starts.</li><li><strong><code>slotStart()</code> creates the dataset and acquisition objects.</strong> Navigation and recorder managers begin operating through events and worker threads.</li><li><strong>GNSS establishes trustworthy time.</strong> Rover may correct the Linux system clock and RTC, then arm time-sensitive validation.</li><li><strong>A shutdown request fans out.</strong> Recorder managers flush and announce readiness. Rover waits, optionally powers sensors off, then quits the event loop.</li><li><strong>systemd observes the exit.</strong> With <code>Restart=always</code>, a normal stop may restart unless the requested post-shutdown action stops the service or powers off.</li></ol>
+<div class="callout danger"><strong>Do not begin by changing hardware state.</strong> First learn with logs, code tracing, unplugged test fixtures, or a designated development Rover. Confirm whether a unit is recording and whether stopping its service is acceptable.</div></section>
+
+<section><h2>Your two development loops</h2><table><thead><tr><th>Loop</th><th>Use it for</th><th>Typical proof</th></tr></thead><tbody>
+<tr><td>Application loop</td><td>Most C++ changes: build Rover against the dependency container, deploy to a development target, restart deliberately.</td><td>Expected startup log, focused behavior test, clean shutdown, no new warnings or data gaps.</td></tr>
+<tr><td>Yocto loop</td><td>Recipes, dependencies, service files, permissions, udev rules, kernel support, and final image integration.</td><td><code>bitbake phoenix-rover</code> or image build, package contents, clean-boot behavior, rollback path.</td></tr>
+</tbody></table><p>Do not pay full-image build time for an ordinary application edit. Do not call a manually copied binary “done” until its recipe and image also reproduce the result.</p></section>
+
+<section id="read"><h2>Repository reading path</h2><ol>
+<li><code>rover/rover.h</code>, then constructor, <code>slotStart()</code>, <code>slotRequestShutDown()</code>, <code>slotTryShutdown()</code>, and <code>main()</code> in <code>rover.cpp</code>.</li>
+<li><code>rover/CMakeLists.txt</code> to see the Qt modules, dependencies, generated resources, and target.</li>
+<li><code>phoenix-rover.service</code> and <code>phoenix-rover.bb</code> under <code>buildimage-yocto/.../recipes-phoenixlidar/phoenix-rover/</code>.</li>
+<li><code>nav.h/.cpp</code>, <code>hostclock.*</code>, and <code>ptpmanager.*</code>.</li>
+<li><code>common/abstractconnection.*</code>, then one small consumer such as <code>rover/ioport.*</code>.</li>
+<li>One sensor family end to end: its settings, controller, recorder, worker, parser, log output, and error path.</li>
+</ol></section>
+
+<section id="week"><h2>A realistic first week</h2><ul class="checklist">
+<li>Draw the startup and shutdown sequences from code without changing anything.</li><li>Build the Rover target and identify the executable, linked Qt version, and build commit.</li><li>On a development unit, collect <code>systemctl status phoenix-rover</code>, recent journal output, stable serial-device names, network interfaces, clocks, and PTP devices.</li><li>Trace one GNSS byte from the device connection into its parser and log file.</li><li>Trace one shutdown request until every recorder reports ready.</li><li>Write down unknown hardware terms and ask which Rover model is your primary development target.</li></ul></section>
+
+<section class="reading"><h2>Proven material to keep open</h2><ul>
+<li><a href="https://doc.qt.io/qt-6/qcoreapplication.html">Qt: QCoreApplication</a> explains the headless event loop at Rover's center.</li>
+<li><a href="https://doc.qt.io/qt-6/threads-qobject.html">Qt: Threads and QObjects</a> is essential before touching worker lifetime or cross-thread calls.</li>
+<li><a href="https://man7.org/linux/man-pages/man5/systemd.service.5%40%40systemd.html">systemd.service</a> defines how systemd supervises Rover.</li>
+<li><a href="https://docs.yoctoproject.org/brief-yoctoprojectqs/index.html">Yocto Project Quick Build</a> supplies the vocabulary behind recipes, layers, machines, and images.</li>
+</ul></section>
+<footer>Repository-grounded orientation, checked 2026-09-04. Commands and paths may differ by Rover generation. Confirm the target hardware before changing services, clocks, firmware, power, or storage.</footer></main></body></html>

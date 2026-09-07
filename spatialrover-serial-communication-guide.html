@@ -1,0 +1,61 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="description" content="Serial communication and troubleshooting for SpatialRover"><title>SpatialRover serial communication</title><link rel="stylesheet" href="rover-guide.css"></head><body><main>
+<nav><a href="index.html">← All guides</a><a href="spatialrover-start-here-guide.html">Start here</a><a href="#layers">Layers</a><a href="#qt">Qt pattern</a><a href="#diagnose">Diagnose</a><a href="#read">Read next</a></nav>
+<div class="eyebrow">SpatialRover learning path · 3 of 4</div><h1>Serial communication from wire to parser</h1><p class="lead">Serial debugging becomes manageable when you separate electrical transport, Linux device identity, port configuration, byte framing, protocol parsing, and application state.</p>
+
+<section id="layers"><h2>Debug one layer at a time</h2><table><thead><tr><th>Layer</th><th>Question</th><th>Typical evidence</th></tr></thead><tbody>
+<tr><td>Physical</td><td>Are power, ground, voltage levels, TX/RX, and flow-control wiring correct?</td><td>Schematic, cable pinout, oscilloscope or logic analyzer.</td></tr>
+<tr><td>USB / kernel</td><td>Did Linux enumerate the adapter and load its driver?</td><td><code>dmesg</code>, <code>lsusb</code>, sysfs.</td></tr>
+<tr><td>Identity</td><td>Which stable name represents this physical device?</td><td><code>/dev/serial/by-id/</code> symlink and udev properties.</td></tr>
+<tr><td>Port settings</td><td>Do baud, data bits, parity, stop bits, and flow control match?</td><td>Configuration and <code>stty</code>.</td></tr>
+<tr><td>Bytes</td><td>Are bytes arriving intact and fast enough?</td><td>Hex capture, byte counts, overrun/error logs.</td></tr>
+<tr><td>Framing</td><td>Where does a packet begin and end?</td><td>Sync bytes, length, delimiter, checksum.</td></tr>
+<tr><td>Semantics</td><td>Does the decoded packet make sense for state and time?</td><td>Parser output and protocol specification.</td></tr>
+</tbody></table></section>
+
+<section><h2>How SpatialRover represents a connection</h2><div class="flow"><div><strong>Stable path</strong><code>/dev/serial/by-id/...</code></div><div><strong><code>AbstractConnection</code></strong>serial or TCP</div><div><strong><code>readyRead</code></strong>event-driven bytes</div><div><strong>Consumer</strong>buffer + parser + log</div></div>
+<ul><li><code>common/abstractconnection.*</code> wraps either <code>QSerialPort</code> or <code>QTcpSocket</code>. A port string such as <code>/dev/...:115200</code> carries the baud rate.</li><li>Serial defaults are 8 data bits, no parity, one stop bit, and no flow control: commonly called <strong>8N1</strong>.</li><li><code>findSerialPort()</code> searches stable device names and can infer common baud rates embedded in names.</li><li><code>rover/nav.cpp</code> identifies supported navigation receivers from <code>/dev/serial/by-id</code>.</li><li><code>rover/ioport.cpp</code> shows deferred initialization, raw RX/TX logging, buffering incomplete packets, parsing complete packets, and reconnecting after an error.</li><li><code>rover/microcontroller.*</code> shows a high-rate case where blocking the reader can lose IMU samples.</li></ul></section>
+
+<section id="qt"><h2>The asynchronous Qt pattern</h2><pre><code>QSerialPort *port = new QSerialPort(this);
+port-&gt;setPortName(devicePath);
+port-&gt;setBaudRate(115200);
+port-&gt;setDataBits(QSerialPort::Data8);
+port-&gt;setParity(QSerialPort::NoParity);
+port-&gt;setStopBits(QSerialPort::OneStop);
+port-&gt;setFlowControl(QSerialPort::NoFlowControl);
+
+connect(port, &amp;QSerialPort::readyRead, this, [this, port] {
+    mReceiveBuffer.append(port-&gt;readAll());
+    parseAllCompleteFrames();
+});
+connect(port, &amp;QSerialPort::errorOccurred, this,
+        [this, port](const QSerialPort::SerialPortError error) {
+            if (error != QSerialPort::NoError)
+                handlePortError(port-&gt;errorString());
+        });
+
+if (!port-&gt;open(QIODevice::ReadWrite))
+    throw std::runtime_error(port-&gt;errorString().toStdString());</code></pre>
+<ul><li><code>readyRead</code> means “some bytes are available,” not “one complete packet arrived.”</li><li>One callback may contain half a packet, one packet, or many packets. Keep a persistent receive buffer.</li><li>A robust parser finds synchronization, validates length and checksum, consumes valid frames, and retains an incomplete tail.</li><li>On corrupt input, make forward progress: discard enough data to search for the next sync marker without looping forever.</li><li><code>write()</code> queues bytes. If completion matters, observe <code>bytesWritten</code>; do not assume the peer received or accepted them.</li><li>Blocking <code>waitForReadyRead()</code> can be reasonable in a dedicated worker thread, but not in an event-loop thread that must handle timers and other devices.</li></ul></section>
+
+<section id="diagnose"><h2>Observe-only checklist</h2><pre><code>ls -l /dev/serial/by-id/
+lsusb
+dmesg --follow
+udevadm info --query=property --name=/dev/ttyUSB0
+stty -F /dev/ttyUSB0 -a
+lsof /dev/ttyUSB0
+journalctl -u phoenix-rover --since '10 minutes ago'</code></pre>
+<div class="callout safe"><strong>Start here:</strong> photograph or record the cabling, device identity, symlink target, configured baud/framing, owning process, and relevant logs. These commands do not intentionally change the device.</div>
+<div class="callout danger"><strong>Opening a serial port is not automatically safe.</strong> QSerialPort uses exclusive access, and terminal programs can steal the port from Rover. Sending arbitrary bytes can reconfigure a GNSS receiver, enter a modem command mode, trigger firmware behavior, or corrupt a capture. Stop the service only on an approved development unit and only after preserving its state.</div>
+
+<h3>Symptom to likely layer</h3><table><thead><tr><th>Symptom</th><th>Check first</th></tr></thead><tbody>
+<tr><td>No device node</td><td>Power, cable, USB enumeration, kernel driver.</td></tr><tr><td><code>Permission denied</code></td><td>Service user, group, udev permissions. Do not “solve” it with world-writable device nodes.</td></tr><tr><td><code>Device busy</code></td><td>Another Rover instance, terminal, updater, or daemon owns the port.</td></tr><tr><td>Gibberish</td><td>Baud, parity, stop bits, electrical standard, inversion.</td></tr><tr><td>Good bytes, no packets</td><td>Framing, checksum, parser state, wrong protocol mode.</td></tr><tr><td>Works, then drops</td><td>USB power/reset, cable, EMI, overflow, consumer blocking, reconnect logic.</td></tr><tr><td>Missing high-rate samples</td><td>Buffer sizing, scheduling latency, synchronous work in read path, device backpressure.</td></tr></tbody></table></section>
+
+<section><h2>Safe practice exercises</h2><ol><li>Use a USB serial loopback adapter disconnected from Rover hardware. Identify it through <code>/dev/serial/by-id</code>.</li><li>Write a tiny Qt console program that buffers newline-delimited input and survives split/multiple reads.</li><li>Replace newlines with a binary frame: sync word, fixed-width length, payload, checksum.</li><li>Feed the parser recorded chunks of every possible boundary size. Verify that chunking does not change results.</li><li>Simulate unplug/replug and verify one reconnect timer, no duplicate connections, and no stale pointer.</li><li>Only then trace <code>AbstractConnection</code>, <code>IoPort</code>, <code>Nav</code>, and <code>MicroController</code> on a development Rover.</li></ol></section>
+
+<section id="read" class="reading"><h2>Proven references</h2><ul>
+<li><a href="https://doc.qt.io/qt-6/qserialport.html">Qt: QSerialPort</a> is the API reference used beneath <code>AbstractConnection</code>.</li>
+<li><a href="https://doc.qt.io/qt-6/qtserialport-examples.html">Qt Serial Port examples</a> contrast the event-driven terminal with blocking worker-thread designs.</li>
+<li><a href="https://man7.org/linux/man-pages/man3/termios.3.html">Linux man-pages: termios</a> explains the Unix settings beneath Qt.</li>
+<li><a href="https://docs.kernel.org/usb/usb-serial.html">Linux kernel: USB serial</a> introduces USB-to-serial drivers and device nodes.</li>
+<li><a href="https://man7.org/linux/man-pages/man8/udevadm.8.html">udevadm</a> documents device-property inspection and event monitoring.</li>
+</ul></section><footer>Repository-grounded guide, checked 2026-09-04. Electrical interfaces are not interchangeable: TTL UART, RS-232, and RS-422/485 use different signaling. Confirm the hardware interface and pinout before connecting equipment.</footer></main></body></html>
