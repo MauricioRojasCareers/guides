@@ -18,3 +18,5 @@ Then open <http://localhost:8000>.
 - Herdr, from zero
 - Neovim: basic to fluent
 - Phusion development with Docker
+
+- [Learn C++ through Qt and Phusion](qt-cpp-phusion-learning-guide.html) — six sessions with runnable examples in `examples/qt-cpp`.

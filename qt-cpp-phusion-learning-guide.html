@@ -1,0 +1,181 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="description" content="Learn C++ and Qt together with runnable sensor exercises and a guided tour of Phusion and SpatialRover."><title>Learn C++ through Qt and Phusion</title><link rel="stylesheet" href="rover-guide.css"><style>details{padding:14px;border:1px solid var(--line);border-radius:10px;margin:18px 0}summary{cursor:pointer;color:var(--mint)}section{scroll-margin-top:20px}h1{font-size:clamp(2.5rem,7vw,5rem)}</style></head><body><main>
+<nav aria-label="Guide navigation"><a href="index.html">← All guides</a><a href="#route">Learning route</a><a href="#setup">Setup</a><a href="#values">C++ values</a><a href="#events">Events</a><a href="#sensor">Your class</a><a href="#widgets">Dashboard</a><a href="#reading">Read Phusion</a><a href="#next">Next steps</a></nav>
+<div class="eyebrow">Follow-along learning path · six sessions</div><h1>Learn C++ through Qt and Phusion</h1><p class="lead">A practical starting point for an experienced programmer learning C++. Build something small, understand why it works, then recognize the same patterns in SpatialExplorer and Rover.</p>
+<section id="route"><h2>Your route: one concept, one experiment, one real file</h2><p>You already know how to program. Start building with Qt now, while deliberately learning the C++ rules that determine whether your program is correct. Spend 45–90 minutes per session. Predict the output, run the example, change it, and explain the result before moving on.</p>
+<p>Qt is much more than a GUI library. SpatialExplorer uses Qt Widgets and Designer forms; Rover uses timers, event loops, networking, and device communication. The exercises below build a simulated sensor dashboard that connects these two sides without requiring hardware.</p>
+<table><tr><th>Session</th><th>You build</th><th>C++ you learn</th><th>Qt you learn</th></tr><tr><td>1</td><td>Reading classifier</td><td>Values, structs, const references, containers</td><td>QString, logging</td></tr><tr><td>2</td><td>Five heartbeats</td><td>Addresses, lambdas, captures, scope</td><td>Event loop, QTimer, connections</td></tr><tr><td>3</td><td>Sensor class</td><td>Headers, inheritance, constructors, members</td><td>QObject, Q_OBJECT, custom signals</td></tr><tr><td>4</td><td>Sensor dashboard</td><td>Pointers and ownership</td><td>Widgets, layouts, signal wiring</td></tr><tr><td>5</td><td>Trace a real dialog</td><td>Destructors, templates, callbacks</td><td>Designer, generated code, cleanup</td></tr><tr><td>6</td><td>Extend your dashboard</td><td>State, validation, data modeling</td><td>Responsiveness and next steps</td></tr></table>
+<div class="callout">Do not postpone lifetimes until “advanced C++.” Learn values, references, pointer ownership, and lambda captures from the start. Templates beyond basic container usage, custom allocators, and heavy metaprogramming can wait.</div></section><section id="setup"><h2>0. Get the small lab running</h2><p>The complete source lives in <a href="examples/qt-cpp/CMakeLists.txt">examples/qt-cpp</a> in this guides repository. Copy it into a learning folder so you can experiment freely:</p><pre><code>mkdir -p /home/mauricio/1playground/qt-learning
+cp -R /home/mauricio/1playground/guides/examples/qt-cpp/. /home/mauricio/1playground/qt-learning/
+cd /home/mauricio/1playground/qt-learning</code></pre><p>The host has CMake and a compiler, but no Qt SDK was found in its standard system location. Your existing <code>phoenix/phusion-builddeps:resolute</code> Docker image provides a route to the lab. Run the following from <code>qt-learning</code>:</p><pre><code>docker run --rm -it --user &quot;$(id -u):$(id -g)&quot; \
+  -v &quot;$PWD:/lab&quot; -w /lab \
+  phoenix/phusion-builddeps:resolute bash
+cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug
+cmake --build build -j2
+./build/values
+./build/heartbeat
+QT_QPA_PLATFORM=offscreen ./build/dashboard --smoke-test
+exit</code></pre><p>The offscreen check opens no visible window and exits automatically; it is useful for checking the build. For an interactive desktop, use the display forwarding setup in <a href="phusion-docker-development-guide.html">Phusion with Docker</a>, mount this lab into that container, and run <code>./build/dashboard</code>. If you already have a desktop Qt 6 SDK, run the same CMake commands directly on the host instead. Use a separate build directory for each toolchain.</p>
+<p>Missing <code>Qt6Config.cmake</code> means CMake cannot find the SDK: run inside the dependency image or pass <code>-DCMAKE_PREFIX_PATH=/path/to/your/Qt/6.x/gcc_64</code> using the actual installed prefix. A platform plugin/display error after a successful build is a runtime display issue; use the offscreen command first.</p><h3>CMakeLists.txt</h3><pre><code>cmake_minimum_required(VERSION 3.22)
+project(QtCppLab LANGUAGES CXX)
+set(CMAKE_CXX_STANDARD 20)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_AUTOMOC ON)
+find_package(Qt6 6.2 REQUIRED COMPONENTS Core Widgets)
+add_executable(values values.cpp)
+target_link_libraries(values PRIVATE Qt6::Core)
+add_executable(heartbeat heartbeat.cpp)
+target_link_libraries(heartbeat PRIVATE Qt6::Core)
+add_executable(dashboard main.cpp sensor.cpp sensor.h)
+target_link_libraries(dashboard PRIVATE Qt6::Widgets)</code></pre><p>CMake creates three executables and links the Qt modules they use. AUTOMOC generates support for our custom QObject class. This lab uses C++20 and Qt 6.2 APIs, matching Rover’s declared baseline. SpatialExplorer currently requests C++23 and Qt 6.5. Some older Phusion tools still reference Qt5; read the CMake file for the target you are working on. <a href="https://doc.qt.io/qt-6/cmake-get-started.html">Qt CMake documentation</a>.</p></section><section id="values"><h2>1. Learn values before objects with parents</h2><h3>values.cpp</h3><pre><code>#include &lt;QDebug&gt;
+#include &lt;QString&gt;
+#include &lt;vector&gt;
+
+struct Reading {
+    QString name;
+    double temperature = 0.0;
+};
+
+bool isHot(const Reading &amp;reading) {
+    return reading.temperature &gt;= 30.0;
+}
+
+int main() {
+    const std::vector&lt;Reading&gt; readings{{&quot;front&quot;, 24.5}, {&quot;rear&quot;, 31.0}};
+    for (const Reading &amp;reading : readings) {
+        qInfo().noquote() &lt;&lt; reading.name &lt;&lt; reading.temperature
+                          &lt;&lt; (isHot(reading) ? &quot;HOT&quot; : &quot;OK&quot;);
+    }
+}</code></pre><p>Run <code>./build/values</code>. Expect <code>front 24.5 OK</code> and <code>rear 31 HOT</code>. The struct groups data; each Reading is a value. The vector owns its elements and releases its storage when it goes out of scope. This deterministic cleanup is part of RAII: tie a resource’s lifetime to an object’s lifetime.</p>
+<table><tr><th>Syntax</th><th>What it means here</th></tr><tr><td><code>const Reading &amp;reading</code></td><td>Borrow an existing Reading without copying it; this reference cannot modify it. The original must remain alive.</td></tr><tr><td><code>reading.temperature</code></td><td>Access a member through a value or reference.</td></tr><tr><td><code>std::vector&lt;Reading&gt;</code></td><td>A template instantiated as a resizable collection of Readings.</td></tr><tr><td><code>QString</code></td><td>A Qt text value. It is copyable; QObject is not. You do not need an application event loop for this simple text operation.</td></tr></table>
+<h3>Try it</h3><ol><li>Add a sensor at exactly 30 °C. Predict its classification.</li><li>Change the threshold into a second function parameter.</li><li>Make a copy of a Reading, change the copy, and print both. Does the original change?</li></ol><details><summary>Checkpoint answer</summary><p>30 is HOT because the comparison includes equality. A copied Reading has independent value semantics. References borrow the original; they do not make a copy or extend its lifetime in this parameter example.</p></details>
+<p><strong>Phusion connection:</strong> open <code>spatialexplorer/dialogviewtraces.cpp</code>. Find <code>std::deque&lt;std::pair&lt;TimePoint, QString&gt;&gt; lastN</code> and the “make a copy” comment. Each pair holds a time and text; the dialog removes entries from its local copy while populating the view.</p></section><section id="events"><h2>2. Let the event loop call your code</h2><h3>heartbeat.cpp</h3><pre><code>#include &lt;QCoreApplication&gt;
+#include &lt;QDebug&gt;
+#include &lt;QTimer&gt;
+
+int main(int argc, char *argv[]) {
+    QCoreApplication app(argc, argv);
+    QTimer timer;
+    int count = 0;
+    QObject::connect(&amp;timer, &amp;QTimer::timeout, &amp;app, [&amp;count, &amp;app] {
+        qInfo() &lt;&lt; &quot;tick&quot; &lt;&lt; ++count;
+        if (count == 5) {
+            app.quit();
+        }
+    });
+    timer.start(500);
+    return app.exec();
+}</code></pre><p>Run <code>./build/heartbeat</code>. Expect ticks 1 through 5, roughly half a second apart, followed by exit. <code>exec()</code> keeps main active while Qt dispatches events; it returns after quit. A timer schedules notifications; it is not a new thread and its interval is not a precision timing guarantee.</p>
+<div class="flow"><div><strong>start(500)</strong>Register timer</div><div><strong>app.exec()</strong>Dispatch events</div><div><strong>timeout</strong>Invoke lambda</div><div><strong>quit()</strong>End event loop</div></div>
+<p><code>&amp;timer</code> takes an object’s address; <code>&amp;QTimer::timeout</code> names a member function. <code>[&amp;count, &amp;app]</code> captures two existing local objects by reference. Both remain alive until the event loop returns. The <code>&amp;app</code> argument before the lambda is its Qt context, which controls connection lifetime and queued execution context.</p>
+<h3>Try it</h3><ol><li>Change the interval to 100 milliseconds and stop at 10 ticks.</li><li>Print a message immediately before and after <code>app.exec()</code>. Predict the order.</li><li>Temporarily replace <code>return app.exec();</code> with <code>return 0;</code>. Why are there no ticks?</li></ol><details><summary>Checkpoint answer</summary><p>The “after” message appears only after quit. Without the event loop, main returns before timeout events can be delivered. A reference capture is appropriate here because the locals outlive every callback invocation; a function returning while a callback still retains references to its locals would leave dangling references.</p></details>
+<p><strong>Phusion connection:</strong> read <code>rover/powerbutton.cpp</code>, searching for <code>mTimerCheckEvents</code>. Its constructor connects timeout to eventRead and starts a 100 ms timer when initialization succeeds. Find its member declaration in <code>powerbutton.h</code>. Read this as a timer example; the actual class also manages Linux device and D-Bus resources.</p></section><section id="sensor"><h2>3. Give your sensor an identity</h2><h3>sensor.h</h3><pre><code>#pragma once
+#include &lt;QObject&gt;
+#include &lt;QTimer&gt;
+
+class Sensor : public QObject {
+    Q_OBJECT
+
+  public:
+    explicit Sensor(QObject *parent = nullptr);
+    void start();
+    void stop();
+
+  signals:
+    void readingChanged(int sequence, double temperature);
+
+  private:
+    QTimer *mTimer = nullptr;
+    int mSequence = 0;
+};</code></pre><h3>sensor.cpp</h3><pre><code>#include &quot;sensor.h&quot;
+
+Sensor::Sensor(QObject *parent) : QObject(parent), mTimer(new QTimer(this)) {
+    mTimer-&gt;setInterval(500);
+    connect(mTimer, &amp;QTimer::timeout, this, [this] {
+        ++mSequence;
+        const double temperature = 20.0 + (mSequence % 20);
+        emit readingChanged(mSequence, temperature);
+    });
+}
+
+void Sensor::start() { mTimer-&gt;start(); }
+void Sensor::stop() { mTimer-&gt;stop(); }</code></pre><p>The header declares the interface; the cpp defines its behavior. <code>Sensor::start</code> means “start belonging to Sensor.” <code>public QObject</code> is inheritance: Sensor gains Qt object behavior. <code>explicit</code> prevents using this constructor as an implicit conversion from a parent pointer. The initializer list constructs the base and initializes members before the constructor body runs.</p>
+<p><code>mTimer</code> is a pointer. <code>mTimer-&gt;start()</code> accesses the pointed-to object. <code>new QTimer(this)</code> makes the Sensor its Qt parent, so destroying the Sensor deletes the timer. This is a specific ownership rule, not a property of raw C++ pointers in general. The lambda captures <code>this</code>, a pointer to this Sensor; the Sensor is also the connection context.</p>
+<p><code>Q_OBJECT</code> enables the generated meta-object features needed by our signal. Declare <code>readingChanged</code> in the header and emit it in the cpp; moc supplies its implementation. A receiver can be an ordinary member function such as start, without a <code>slots:</code> declaration when using typed connect. Signals do not inherently create asynchronous work: same-thread automatic connections normally invoke receivers immediately. <a href="https://doc.qt.io/qt-6/signalsandslots.html">Qt signals and slots</a>.</p>
+<h3>Try it</h3><ol><li>Change the generated temperature range to 10–29 °C.</li><li>Add a <code>reset()</code> method that sets mSequence to zero. Decide whether it also emits a reading, then explain your choice.</li><li>Temporarily remove sensor.h from CMake’s source list and investigate any moc issues; restore it afterward. Exact discovery behavior can depend on includes.</li></ol><details><summary>Checkpoint answer</summary><p>The sequence persists across stop/start because stop only stops the timer. A reset that emits a new reading is a different API from a reset that merely changes the next generated reading. Neither needs a thread.</p></details></section><section id="widgets"><h2>4. Wire a small dashboard together</h2><h3>main.cpp</h3><pre><code>#include &quot;sensor.h&quot;
+#include &lt;QApplication&gt;
+#include &lt;QLabel&gt;
+#include &lt;QPushButton&gt;
+#include &lt;QStringList&gt;
+#include &lt;QTimer&gt;
+#include &lt;QVBoxLayout&gt;
+#include &lt;QWidget&gt;
+
+int main(int argc, char *argv[]) {
+    QApplication app(argc, argv);
+    QWidget window;
+    window.setWindowTitle(&quot;Simulated sensor — Qt + C++ lab&quot;);
+    auto *layout = new QVBoxLayout(&amp;window);
+    auto *status = new QLabel(&quot;Stopped&quot;, &amp;window);
+    auto *reading = new QLabel(&quot;No readings yet&quot;, &amp;window);
+    auto *start = new QPushButton(&quot;Start&quot;, &amp;window);
+    auto *stop = new QPushButton(&quot;Stop&quot;, &amp;window);
+    layout-&gt;addWidget(status);
+    layout-&gt;addWidget(reading);
+    layout-&gt;addWidget(start);
+    layout-&gt;addWidget(stop);
+    auto *sensor = new Sensor(&amp;window);
+
+    QObject::connect(start, &amp;QPushButton::clicked, sensor, &amp;Sensor::start);
+    QObject::connect(stop, &amp;QPushButton::clicked, sensor, &amp;Sensor::stop);
+    QObject::connect(start, &amp;QPushButton::clicked, status, [status] {
+        status-&gt;setText(&quot;Running&quot;);
+    });
+    QObject::connect(stop, &amp;QPushButton::clicked, status, [status] {
+        status-&gt;setText(&quot;Stopped&quot;);
+    });
+    QObject::connect(sensor, &amp;Sensor::readingChanged, reading,
+                     [reading](int sequence, double temperature) {
+        reading-&gt;setText(QString(&quot;Reading %1: %2 °C&quot;).arg(sequence).arg(temperature, 0, &#x27;f&#x27;, 1));
+    });
+    window.resize(360, 180);
+    window.show();
+
+    // Optional automated smoke check; ordinary launches stay interactive.
+    int received = 0;
+    bool valid = true;
+    const bool smoke = app.arguments().contains(&quot;--smoke-test&quot;);
+    if (smoke) {
+        QObject::connect(sensor, &amp;Sensor::readingChanged, &amp;app,
+                         [&amp;received, &amp;valid, stop](int sequence, double temperature) {
+            ++received;
+            valid = valid &amp;&amp; sequence == received &amp;&amp; temperature == 20.0 + sequence;
+            if (received == 2) {
+                stop-&gt;click();
+            }
+        });
+        start-&gt;click();
+        QTimer::singleShot(2200, &amp;app, [&amp;app, &amp;received, &amp;valid, status, reading] {
+            app.exit(valid &amp;&amp; received == 2 &amp;&amp; status-&gt;text() == &quot;Stopped&quot;
+                     &amp;&amp; reading-&gt;text().startsWith(&quot;Reading 2:&quot;) ? 0 : 1);
+        });
+    }
+    return app.exec();
+}</code></pre><p>Build again, then launch <code>./build/dashboard</code> with desktop display access. Click Start: the first sample arrives after about 500 ms. Stop freezes the reading; Start resumes the sequence. Closing the window exits the application by default. The final block is an optional smoke check; ignore it on your first reading of the program.</p>
+<p><code>auto *sensor</code> asks the compiler to deduce the pointer type, still statically checked. The window is a local value; its children are allocated with the window as their parent. The window owns the sensor, buttons, labels, and installed layout; the sensor owns its timer. When main exits, the window destructor releases this child tree. A raw pointer variable by itself owns nothing. For non-QObject resources, prefer values or an appropriate RAII owner such as <code>std::unique_ptr</code>; avoid giving two independent owners responsibility for deleting the same object. <a href="https://doc.qt.io/qt-6/objecttrees.html">Qt object trees and ownership</a>.</p>
+<p>The label update lambda captures the label pointer by value. That copies the address, not the QLabel. Using that same label as the connection context ensures Qt disconnects this callback when the label is destroyed. <code>QString::arg</code> substitutes values into the display text. The Sensor knows nothing about labels: its notification can drive a UI, logging, or another receiver.</p>
+<h3>Try it and verify</h3><ol><li>Connect readingChanged to a second lambda that logs each sample. Confirm both receivers run.</li><li>Add a Reset button connected to your reset method. Verify the first sample after resetting has sequence 1.</li><li>Click Start repeatedly. The existing timer restarts; you should not accumulate duplicate connections because connections are created once during setup.</li><li>Close while running and reopen. The new process begins with fresh state.</li></ol>
+<p><strong>Phusion connection:</strong> open <code>spatialexplorer/dialogsettingslocal.cpp</code> and find its constructor. Trace the OK button connection to accept, Cancel to reject, and the directory button’s lambda. These are the same sender → notification → receiver relationships as the lab.</p></section><section id="reading"><h2>5. Read a real Phusion dialog with a checklist</h2><p>Start at <code>/home/mauricio/1playground/phusion</code>. Use symbol searches so these instructions survive line-number changes:</p><pre><code>cd /home/mauricio/1playground/phusion
+rg -n &#x27;DialogViewTraces|setupUi|delete ui|setAdditionalMessageHandler&#x27; spatialexplorer/dialogviewtraces.*
+rg -n &#x27;class DialogSettingsLocal|Q_OBJECT&#x27; spatialexplorer/dialogsettingslocal.h
+rg -n &#x27;connect\(&#x27; spatialexplorer/dialogsettingslocal.cpp
+rg -n &#x27;int main|return rover.exec&#x27; rover/rover.cpp
+rg -n &#x27;int main|exec\(&#x27; spatialexplorer/spatialexplorer.cpp</code></pre><ol><li>Read <code>dialogviewtraces.h</code>: identify its base class, constructor, destructor, and Ui pointer.</li><li>Open <code>dialogviewtraces.ui</code>: find the plainTextEdit object name. The XML describes the widget tree.</li><li>Read the constructor in the cpp: setupUi builds that tree, then C++ populates and connects behavior.</li><li>Read the destructor: deleting the generated Ui helper differs from deleting its widgets, which have Qt parents. The helper itself is not a QObject.</li><li>Find setAdditionalMessageHandler. This is a stored C++ callback, not a Qt connect. Notice that the destructor explicitly clears it. Qt’s automatic connection cleanup does not apply to arbitrary callback storage.</li></ol>
+<div class="callout">Existing code is a reading exercise, not a universal template. This dialog calls processEvents and even comments on side effects. Processing nested events can re-enter application code before the current operation is finished. Do not copy this as the solution to a frozen UI; keep callbacks short and separate long work.</div>
+<h3>Your first Designer exercise</h3><p>In your own lab, create a Qt Widgets form with a QLabel and two QPushButtons. Set object names to readingLabel, startButton, and stopButton. Recreate the dashboard wiring against those names. Enable <code>CMAKE_AUTOUIC</code>, include the generated <code>ui_*.h</code> in the implementation, and list the form in the target. Follow <a href="phusion-qt-development-guide.html#dialog">the existing dialog guide</a> for the class structure. Change the .ui file, rebuild, and confirm the generated output changes; never edit generated headers.</p>
+<p>You are ready to make a small Phusion UI change when you can explain the header, setupUi, one connection, and both the widget and callback cleanup paths. Use the <a href="phusion-coding-style-guide.html">coding style guide</a> before preparing a change.</p></section><section id="next"><h2>6. Extend the lab, then pick a Phusion direction</h2><h3>Capstone: a useful simulated sensor monitor</h3><ol><li>Add a temperature threshold with QDoubleSpinBox. Store the threshold separately from the display string.</li><li>Show HOT or OK from each incoming numeric reading. Test equality at the threshold and changing the threshold while stopped.</li><li>Keep the last 20 readings in a value container. Drop the oldest when adding the 21st.</li><li>Show the count, minimum, and maximum. Define the empty-state display before coding.</li><li>Add a clear-history button and verify that acquisition continues after clearing.</li></ol>
+<p><strong>Completion check:</strong> the dashboard remains responsive; Start/Stop/Reset behavior is intentional; empty history is handled; equality is tested; closing while active exits cleanly. Explain which objects own memory and which variables merely borrow it.</p>
+<table><tr><th>If your next task is…</th><th>Learn next</th><th>Start reading</th></tr><tr><td>Desktop UI</td><td>Designer, dialogs, model/view, validation</td><td><a href="phusion-qt-development-guide.html">Qt development in Phusion</a></td></tr><tr><td>Rover acquisition</td><td>QCoreApplication, timers, startup/shutdown</td><td><a href="spatialrover-start-here-guide.html">Rover start here</a>, then <a href="spatialrover-qt-lifecycle-guide.html">Qt lifecycle</a></td></tr><tr><td>Sensor communication</td><td>QByteArray, partial reads, parsing and buffering</td><td><a href="spatialrover-serial-communication-guide.html">Serial communication</a></td></tr></table>
+<p>For long CPU work, learn worker objects and thread affinity next. A normal method call still runs in the calling thread even if its QObject has another affinity. Queued connections deliver work through the receiver’s thread event loop; a worker must never update widgets directly. Do not move this lab’s objects between threads until you can describe their ownership and shutdown order. <a href="https://doc.qt.io/qt-6/threads-qobject.html">Qt threads and QObjects</a>.</p>
+<h3>Keep learning C++ alongside every feature</h3><p>When you meet a new declaration, ask: value or identity? copy or borrow? who destroys it? can this callback outlive what it captures? Then learn the syntax you need: constructors and destructors, const correctness, references, RAII, standard containers, iteration, and lambdas. Follow those with error handling, smart pointers, and move semantics. Qt provides the practical reason to learn these; the language rules explain why the result works.</p></section><section id="debug"><h2>When something breaks</h2><table><tr><th>Symptom</th><th>First check</th></tr><tr><td>Undefined reference to vtable or a custom signal</td><td>Check Q_OBJECT, AUTOMOC, header inclusion in the target, and that declared virtual functions/destructors have definitions. Reconfigure and rebuild.</td></tr><tr><td>No timer output</td><td>Is the timer still alive, started, and serviced by a running event loop?</td></tr><tr><td>Frozen window</td><td>Look for long loops, sleeps, or blocking I/O in a GUI callback. A timer does not make its callback run on a worker thread.</td></tr><tr><td>Crash after closing a dialog</td><td>Check captured references/raw pointers and callbacks registered outside QObject::connect.</td></tr><tr><td>Callback runs twice</td><td>Look for repeated connect calls, especially inside Start handlers.</td></tr><tr><td>Cannot find ui_*.h</td><td>Check the .ui filename, AUTOUIC, target sources, and generated include name.</td></tr></table>
+<p>Record the smallest reproduction, your expected behavior, and what actually happened. Read the first compiler error before chasing the later ones.</p></section><footer>Based on the local Phusion checkout inspected September 8, 2026. Repository paths are relative to /home/mauricio/1playground/phusion. Examples are original teaching code, not extracted production components. Qt documentation links track Qt 6; use the version selector when consulting APIs for your installed SDK.</footer></main></body></html>
