@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="referrer" content="no-referrer"><title>Workout tracker</title>
+<style>
+:root{color-scheme:light dark;font-family:system-ui,sans-serif;color:var(--foreground,CanvasText);background:transparent}body{margin:0}main{max-width:720px;margin:auto;padding:16px}h1{font-size:22px;margin:0 0 8px}h2{font-size:18px;margin:0 0 8px}p{margin:6px 0;line-height:1.5}.muted{opacity:.7}section{padding:20px 0;border-bottom:1px solid color-mix(in srgb,currentColor 18%,transparent)}.set{display:grid;grid-template-columns:90px minmax(0,1fr) minmax(0,1fr);gap:14px;align-items:end;margin-top:14px}.done{display:flex;align-items:center;gap:8px;min-height:44px;white-space:nowrap}label.field{display:grid;gap:6px;font-size:14px}input[type=number]{box-sizing:border-box;width:100%;min-width:0;min-height:44px;font:inherit;font-size:16px;padding:8px;border:1px solid color-mix(in srgb,currentColor 25%,transparent);border-radius:6px;background:transparent;color:inherit}input[type=checkbox]{width:23px;height:23px;margin:0;accent-color:var(--primary,Highlight)}progress{width:100%;height:10px;accent-color:var(--primary,Highlight)}#connection{min-height:24px}button{font:inherit;padding:10px} @media(max-width:360px){main{padding:10px}.set{grid-template-columns:80px minmax(0,1fr) minmax(0,1fr);gap:8px}}
+</style></head><body><main>
+<h1>Saturday, November 14</h1><p id="connection" role="status">Connecting to saved workout…</p><p id="progress-text"></p><progress id="progress" value="0" max="20" aria-label="Required workout steps completed"></progress><div id="exercises"></div>
+</main><script>
+let state;let pending=0;let saving=Promise.resolve();let api='';let access='';
+const container=document.getElementById('exercises');const status=document.getElementById('connection');
+async function connect(){
+ try{
+  const fragment=new URLSearchParams(location.hash.slice(1));
+  access=fragment.get('key')||localStorage.getItem('fitness-access-key')||'';
+  if(!access){status.textContent='Open the private access link from your coaching chat.';return}
+  localStorage.setItem('fitness-access-key',access);
+  if(location.hostname==='localhost'||location.hostname==='127.0.0.1')api=location.origin;
+  else{const response=await fetch('connection.json?v='+Date.now(),{cache:'no-store'});if(!response.ok)throw Error();const config=await response.json();const url=new URL(config.api);if(url.protocol!=='https:'||!url.hostname.endsWith('.trycloudflare.com'))throw Error();api=url.origin}
+  await refresh();
+ }catch(e){status.textContent='Cannot connect. Ask your coach to check the save endpoint.'}
+}
+function render(next){state=next;container.replaceChildren();let done=0,total=0;
+for(const exercise of state.exercises){const section=document.createElement('section');const title=document.createElement('h2');title.textContent=exercise.name;section.append(title);for(const text of [exercise.plan,exercise.cue]){const p=document.createElement('p');p.textContent=text;section.append(p)}
+exercise.sets.forEach((set,index)=>{if(!exercise.optional){total++;if(set.done)done++}const row=document.createElement('div');row.className='set';const label=document.createElement('label');label.className='done';const check=document.createElement('input');check.type='checkbox';check.checked=set.done;check.setAttribute('aria-label',exercise.name+' set '+(index+1)+' completed');check.onchange=()=>save(exercise.id,index,'done',check.checked);label.append(check,document.createTextNode(exercise.sets.length===1?'Done':'Set '+(index+1)));row.append(label);
+if(exercise.strength){for(const [key,caption] of [['weight',exercise.perHand?'Lb / hand':'Weight (lb)'],['reps','Actual reps']]){const field=document.createElement('label');field.className='field';field.textContent=caption;const input=document.createElement('input');input.type='number';input.min=0;input.step=key==='weight'?.5:1;input.value=set[key]??'';input.placeholder='—';input.setAttribute('aria-label',exercise.name+' set '+(index+1)+' '+caption);input.onchange=()=>save(exercise.id,index,key,input.value===''?null:Number(input.value));field.append(input);row.append(field)}}section.append(row)});container.append(section)}document.getElementById('progress-text').textContent=done+' / '+total+' required steps complete';const p=document.getElementById('progress');p.max=total;p.value=done;}
+function save(exercise,index,key,value){pending++;status.textContent='Saving…';saving=saving.catch(()=>{}).then(async()=>{const response=await fetch(api+'/api/state',{method:'PATCH',headers:{'Content-Type':'application/json','Authorization':'Bearer '+access},body:JSON.stringify({exercise,set:index,fields:{[key]:value}})});if(!response.ok)throw Error('Save failed');const next=await response.json();pending--;if(!pending){if(document.activeElement?.tagName!=='INPUT'&&(!state||next.revision>=state.revision))render(next);status.textContent='Saved · revision '+next.revision}}).catch(()=>{pending--;status.textContent='Not saved. Check connection and change the field again.'});}
+async function refresh(){if(!api||!access||pending||document.activeElement?.tagName==='INPUT')return;try{const response=await fetch(api+'/api/state',{cache:'no-store',headers:{Authorization:'Bearer '+access}});if(!response.ok)throw Error();const next=await response.json();if(pending||document.activeElement?.tagName==='INPUT')return;if(!state||next.revision>state.revision)render(next);status.textContent='Saved · revision '+next.revision}catch(e){status.textContent='Connection unavailable · changes cannot be saved'}}
+connect();setInterval(refresh,3000);window.addEventListener('focus',refresh);
+</script></body></html>
