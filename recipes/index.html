@@ -16,6 +16,7 @@ a{color:var(--accent)}
 header .eyebrow{color:var(--accent);font-weight:800;font-size:.78rem;letter-spacing:.14em;text-transform:uppercase}
 h1{font-size:clamp(2rem,7vw,2.8rem);line-height:1.05;margin:.2em 0 .3em;letter-spacing:-.02em}
 .lead{color:var(--muted);margin:0 0 18px}
+details.card,.section{scroll-margin-top:72px}
 nav{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 28px;position:sticky;top:0;padding:10px 0;background:var(--bg);z-index:2}
 nav a{padding:7px 12px;border:1px solid var(--line);border-radius:999px;text-decoration:none;color:var(--text);font-size:.92rem;background:var(--panel)}
 h2.section{font-size:1.45rem;margin:36px 0 6px}
@@ -65,6 +66,22 @@ footer{margin-top:40px;color:var(--muted);font-size:.88rem}
 <!-- ============ MICROWAVE ============ -->
 <h2 class="section" id="reheat">Microwave reheating</h2>
 <p class="section-note">For every method: use a microwave-safe bowl, cover it loosely (never sealed tight), and open the cover away from your face because the steam is hot. Leftovers are safe at <strong>165°F</strong>.</p>
+
+<details class="card" data-list="mw-salmon" id="mw-salmon">
+  <summary>🐟 Cooked salmon <span class="summary-meta">· ~2–4 min</span></summary>
+  <div class="body">
+    <ul class="checks">
+      <li><label><input type="checkbox"><span>Take the salmon out and put it on a microwave-safe plate, <strong>skin side down</strong>. Cut a thick fillet in half so it heats evenly.</span></label></li>
+      <li><label><input type="checkbox"><span>Sprinkle on <strong>1–2 teaspoons of water</strong> (or a squeeze of lemon).</span></label></li>
+      <li><label><input type="checkbox"><span>Cover loosely with a <strong>damp paper towel</strong> or microwave-safe lid.</span></label></li>
+      <li><label><input type="checkbox"><span>Microwave at <strong>50% power for 1 minute</strong>.</span></label></li>
+      <li><label><input type="checkbox"><span>Flip it or turn the plate, then heat at <strong>50% power in 20–30 second bursts</strong>.</span></label></li>
+      <li><label><input type="checkbox"><span>Check the thickest part after each burst and stop at <strong>165°F</strong>.</span></label></li>
+      <li><label><input type="checkbox"><span>Let stand covered for <strong>1 minute</strong>, then eat.</span></label></li>
+    </ul>
+    <p class="tip">Low power keeps it from drying out or popping. To set the power, press <strong>Power Level</strong>, then <strong>5</strong>, usually after entering the time. The skin won't stay crisp in the microwave, so peel it off if it's soggy. Eat leftover salmon within <strong>3–4 days</strong> of cooking.</p>
+  </div>
+</details>
 
 <details class="card" data-list="mw-chicken">
   <summary>🍗 Meal-prepped chicken <span class="summary-meta">· ~3–4 min</span></summary>
@@ -278,6 +295,12 @@ footer{margin-top:40px;color:var(--muted);font-size:.88rem}
     });
     update();
   });
+  const openTarget = () => {
+    const target = location.hash.length > 1 && document.getElementById(location.hash.slice(1));
+    if (target && target.matches('details.card')) { target.open = true; target.scrollIntoView(); }
+  };
+  openTarget();
+  window.addEventListener('hashchange', openTarget);
 })();
 </script>
 </body>
